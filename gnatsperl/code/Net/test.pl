@@ -18,10 +18,19 @@ print "ok 1\n";
 # (correspondingly "not ok 13") depending on the success of chunk 13
 # of the test code):
 
-print "\nNote: remaining tests will fail if gnatsd is not\n".
-      "running on localhost:1529\n\n";
+if (defined $ENV{GNATSDB}) {
+  ($server, $port, $db, $username, $password) = split /:/, $ENV{GNATSDB};
+}
+$server   = 'localhost' unless length $server;
+$port     = 1529        unless length $port;
+$username = ''          unless length $username;
+$password = ''          unless length $password;
+$db       = 'default'   unless length $db;
 
-my $g = Net::Gnats->new();
+print "\nNote: remaining tests will fail if gnatsd is not\n".
+      "running on $server:$port\n\n";
+
+my $g = Net::Gnats->new($server, $port);
 my $connected;
 
 if ($g->connect()) {
@@ -33,6 +42,8 @@ if ($g->connect()) {
 }
 
 if ($connected) { #bypass remaining tests if not connected
+    $g->login($db, $username, $password);
+
     if (defined $g->listDatabases()) {
         print "ok 3\n";
     } else {
