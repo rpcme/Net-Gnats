@@ -18,17 +18,29 @@ print "ok 1\n";
 # (correspondingly "not ok 13") depending on the success of chunk 13
 # of the test code):
 
+print "\nNote: remaining tests will fail if gnatsd is not\n".
+      "running on localhost:1529\n\n";
 
-my $g = Net::Gnats->new();
+my $g = Net::Gnats->new("sdflskjdf");
+my $connected;
+
 if ($g->connect()) {
+    $connected = 1;
     print "ok 2\n";
 } else {
+    $connected = 0;
     print "not ok 2\n";
 }
 
-if (defined $g->listDatabases()) {
-    print "ok 3\n";
+if ($connected) { #bypass remaining tests if not connected
+    if (defined $g->listDatabases()) {
+        print "ok 3\n";
+    } else {
+        print "not ok 3\n";
+    }
+
 } else {
+    #fail all remaining tests
     print "not ok 3\n";
 }
     
