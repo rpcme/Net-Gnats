@@ -463,12 +463,27 @@ sub submitPR {
 
 
 
-sub getPRByNumber { #tie with EXPR, QFMT, and QUER ??
+sub getPRByNumber { 
     my $self = shift;
     my $num = shift;
+
     my ($code, $response) = $self->_doGnatsCmd("RSET");
+    if (not $self->_isCodeOK($code)) {
+        $self->_markError($code, $response);
+        return undef;
+    }
+    
     ($code, $response) = $self->_doGnatsCmd("QFMT full");
+    if (not $self->_isCodeOK($code)) {
+        $self->_markError($code, $response);
+        return undef;
+    }
+
     ($code, $response) = $self->_doGnatsCmd("QUER $num");
+    if (not $self->_isCodeOK($code)) {
+        $self->_markError($code, $response);
+        return undef;
+    }
 
     my $pr = Net::Gnats::PR->new();
     $pr->setFromString($response);
