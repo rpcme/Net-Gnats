@@ -75,7 +75,8 @@ sub getKeys {
 
 sub asHash {
     my $self = shift;
-    return %{$self->{fields}}; #XXX Deep copy?
+    return %{$self->{fields}} if defined($self->{fields}); #XXX Deep copy?
+    return undef;
 }
 
 sub asString {
