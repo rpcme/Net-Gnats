@@ -61,7 +61,7 @@ sub main{
     if ($checkRC) {
         print "Checked ok\n";
     } else {
-        print "Check Failedk\n";
+        print "Check Failed\n";
         print $g->getErrorCode().": ".$g->getErrorMessage()."\n";
     }
 
@@ -71,8 +71,8 @@ sub main{
 
     print "Searching for all PRs\n";
     my @bugsNums = $g->query('Number>"12"', 'Category="MBZ"');
+
     print "Found ". join(":",@bugsNums)."\n";     
- 
 
     print "Getting a PR\n";
     my $PRtwo = $g->getPRByNumber(2);

@@ -81,12 +81,12 @@ sub connect {
     $paddr = sockaddr_in($self->{hostPort}, $iaddr);
     $proto = getprotobyname('tcp');
     if(!socket(SOCK, PF_INET, SOCK_STREAM, $proto)) {
-        warn("gnatsweb: client_init error: $!". print_stacktrace());
+        warn("gnatsweb: client_init error: $!");
         return 0;
     }
     if(!connect(SOCK, $paddr))
     {
-        warn("gnatsweb: client_init error: $! ;". print_stacktrace());
+        warn("gnatsweb: client_init error: $! ;");
         return 0;
     }
     SOCK->autoflush(1);
@@ -357,7 +357,7 @@ sub checkNewPR {
     my $self = shift;
     my $pr = shift;
     my $code; my $response;
-    ($code, $response) = $self->_doGnatsCmd("CHEK intial");
+    ($code, $response) = $self->_doGnatsCmd("CHEK initial");
     if ($self->_isCodeOK($code)) {
         ($code, $response) = $self->_doGnatsCmd("$pr\n.");
         if ($self->_isCodeOK($code)) {
@@ -503,22 +503,37 @@ sub expr {
     return $code; #XXX TODO and codes together or abort or something
 } 
 
-sub query { #tie with EXPR, QFMT, and QUER ??
+sub query { 
     my $self = shift;
     my @exprs = @_;
    
     my ($code, $response) = $self->_doGnatsCmd("RSET"); #XXX TODO  
+    if (not $self->_isCodeOK($code)) {
+        $self->_markError($code, $response);
+        return undef;
+    }
+    
     ($code, $response) = $self->_doGnatsCmd("QFMT Number"); #XXX TODO  
-
+    if (not $self->_isCodeOK($code)) {
+        $self->_markError($code, $response);
+        return undef;
+    }
+    
     foreach my $expr (@exprs) {
         ($code, $response) = $self->_doGnatsCmd("EXPR $expr"); 
+        if (not $self->_isCodeOK($code)) {
+            $self->_markError($code, $response);
+            return undef;
+        }
     }
-
 
     my @nums;
     ($code, $response) = $self->_doGnatsCmd("QUER");
     if ($self->_isCodeOK($code)) {
         @nums = $self->_extractListContent($response);
+    } else {
+        $self->_markError($code, $response);
+        return undef;
     }
     return @nums;
 }
@@ -606,8 +621,14 @@ sub _doGnatsCmd {
     my $cmd = shift;
     
     $self->_clearError();  
+    #print "sending |$cmd\n|\n";
     print SOCK "$cmd\n";
     my $response = $self->_getGnatsdResponse();
+    #print "received |$response|\n";
+
+    my $bugstring="411 There is a bad value";
+    <SOCK> if $response =~/^$bugstring/;
+
     my $code;
     $code = $self->_extractResponseCode($response);
     $self->{lastCode} = $code;
