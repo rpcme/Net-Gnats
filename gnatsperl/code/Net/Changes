@@ -1,5 +1,56 @@
 Revision history for Perl extension Net::Gnats.
 
+0.06
+
+Gnats.pm
+- Added 'Net::Gnats::updatePR' method so multiple fields can be changed
+  with one call instead of having to call replaceField multiple times.
+- Added 'Net::Gnats::newPR' method.
+- Added 'Net::Gnats::filloutPR' method which fills out a new PR with the
+  field defaults specified in the gnats dbconfig.
+- Fixed checking for when gnatsd will return a multiline response.
+  Previosuly all codes from 300-399 (except 350) where assumed to be
+  multiline.  But the gnatsd spec says only 300-349 will be multiline.
+- When PR's are unparsed into a string the MultiText fields are properly
+  escaped.
+- Added ability to turn on debugging with '$Net::Gnats:debugGnatsd = 1'
+- Work around a bug in gnatsd where it doesn't properly close file handles,
+  so gnatsperl closes and reopens the connection after 100 newPRs.  I've
+  submitted a patch to gnats but it's not been incorporated yet. 
+- Disabled the listClasses method since gnatsd does not support it
+  anymore.
+- Methods listFieldNames, listInitialInputFields, getFieldType,
+  isValidField, getFieldTypeInfo, getFieldFlags, getFieldDefault, only
+  query gnatsd once for the information so multiple calls to these methods
+  are much faster.
+- Net::Gnats:lockPR extracts the PR data and returns a Net::Gnats::PR
+  object.
+- Added Net::Gnats::checkPR method.  Changed checkNewPR method to call
+  checkPR.
+- Improved checking for "requireChangeReason" checking in replaceField
+  method.
+- submitPR method calls PR::unparse method.
+- Split out some code in _doGnatsCmd into new '_readAndPrcessResponse'
+  method so other methods could use the same code.
+
+
+PR.pm
+- Net::Gnats::PR::new method now requires the Net::Gnats object as the
+  first argument.   This was done to provide better error checking.  The
+  best was to fix existing code is to change any Net::Gnats::PR::new calls
+  to $g->new().  See documentation.
+- The PR number is no longer tracked differently inside PR.pm.  It's now
+  treated like all other fields.  Users will not notice this change since
+  the getNumber method still works like previous versions.  However if you
+  were accessing the $pr->{number} data directly it won't work anymore.
+- The setField method takes an optional argument which is the changeReason.
+  - Currently setField does not require the changeReason to be specified,
+    but this may change in the next release.
+- Major change to methods that parse and unparse PR's.  A lot of code was
+  copied from gnatsweb so gnatsperl now does a much better job of handling
+  PR data.  Also, in the future this will allow us to handle gnatsweb style
+  attachements.
+
 0.01  Sun Aug 25 20:09:22 2002
 	- original version; created by h2xs 1.20 with options
 		-X -n Net::Gnats
