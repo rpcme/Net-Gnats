@@ -25,7 +25,7 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT = qw(
     new	
 );
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 
 use strict;
@@ -764,7 +764,7 @@ Net::Gnats - Perl interface to GNU Gnats daemon
   $g->disconnect();
 
 
-=head1 ABSTRACT
+=head1 DESCRIPTION
 
 Net::Gnats provides a perl interface to the gnatsd command set.  Although 
 most of the gnatsd command are present and can be explicitly called through
