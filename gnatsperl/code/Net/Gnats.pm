@@ -57,6 +57,8 @@ sub new
     
     $self->{lastCode} = undef;
     $self->{lastResponse} = undef;
+    $self->{errorCode} = undef;
+    $self->{errorMessage} = undef;
 
     return $self;
 
@@ -108,8 +110,11 @@ sub getDBNames {
     ($code, $response) = $self->_doGnatsCmd("DBLS");
     if ($self->_isCodeOK($code)) {
         return $self->_extractListContent($response);
+    } else {
+        $self->_markError($code, $response);
+        return undef;
     }
-    #FIXME what if not ok?
+    
 }
 
 
@@ -124,7 +129,6 @@ sub listCategories {
     my $self = shift;
     my @cats = $self->_list("CATEGORIES", qw(name desc contact something));
     return @cats;
-    #FIXME what if not ok?
 }
 
 sub listSubmitters {
@@ -132,21 +136,18 @@ sub listSubmitters {
     my @cats = $self->_list("SUBMITTERS", 
                     qw(name desc contract something1 responsible));
     return @cats;
-    #FIXME what if not ok?
 }
 
 sub listResponsible {
     my $self = shift;
     my @cats = $self->_list("RESPONSIBLE", qw(name realname email));
     return @cats;
-    #FIXME what if not ok?
 }
 
 sub listStates {
     my $self = shift;
     my @cats = $self->_list("STATES", qw(name type desc));
     return @cats;
-    #FIXME what if not ok?
 }
 
 
@@ -154,21 +155,18 @@ sub listClasses {
     my $self = shift;
     my @cats = $self->_list("CLASSES", qw(name desc));
     return @cats;
-    #FIXME what if not ok?
 }
 
 sub listFieldNames {
     my $self = shift;
     my @cats = $self->_list("FIELDNAMES", qw(name));
     return @cats;
-    #FIXME what if not ok?
 }
 
 sub listInitialInputFields {
     my $self = shift;
     my @cats = $self->_list("INITIALINPUTFIELDS", qw(name));
     return @cats;
-    #FIXME what if not ok?
 }
 
 sub getFieldType {
@@ -176,13 +174,26 @@ sub getFieldType {
     my $field = shift;
     my $code; my $response;
     ($code, $response) = $self->_doGnatsCmd("FTYP $field");
-    return $response; #TODO parse?
-    #FIXME what if not ok?
+    if ($self->_isCodeOK($code)) {
+        return $response;
+    } else {
+        $self->_markError($code, $response);
+        return undef;
+    }
 }
 
-sub getFieldTypeInfo { #NOT IMPLEMENTED
+sub getFieldTypeInfo { 
     my $self = shift;
     my $field = shift;
+    my $property = shift;
+    my $code; my $response;
+    ($code, $response) = $self->_doGnatsCmd("FTYPINFO $field $property");
+    if ($self->_isCodeOK($code)) {
+        return $response;
+    } else {
+        $self->_markError($code, $response);
+        return undef;
+    }
 }
 
 
@@ -191,8 +202,12 @@ sub getFieldDesc {
     my $field = shift;
     my $code; my $response;
     ($code, $response) = $self->_doGnatsCmd("FDSC $field");
-    return $response; #TODO parse?
-    #FIXME what if not ok?
+    if ($self->_isCodeOK($code)) {
+        return $response;
+    } else {
+        $self->_markError($code, $response);
+        return undef;
+    }
 }
 
 sub getFieldFlags {
@@ -200,20 +215,26 @@ sub getFieldFlags {
     my $field = shift;
     my $code; my $response;
     ($code, $response) = $self->_doGnatsCmd("FIELDFLAGS $field");
-    return $response; #TODO parse?
-    #FIXME what if not ok?
+    if ($self->_isCodeOK($code)) {
+        return $response;
+    } else {
+        $self->_markError($code, $response);
+        return undef;
+    }
 }
 
 sub getFieldValidators {
     my $self = shift;
     my $field = shift;
     my $code; my $response;
-    ($code, $response) = $self->_doGnatsCmd("FIELDFLAGS $field");
+    ($code, $response) = $self->_doGnatsCmd("FVLD $field");
     if ($self->_isCodeOK($code)) {
         my @validators = $self->_extractListContent($response);
         return @validators;
+    } else {
+        $self->_markError($code, $response);
+        return undef;
     }
-    #FIXME what if not ok?
 }
 
 
@@ -228,9 +249,11 @@ sub validateField {
         if ($self->_isCodeOK($code)) {
             return 1;
         } else {
+            $self->_markError($code, $response);
             return 0;
         } 
     } else {
+        $self->_markError($code, $response);
         return 0;
     }
 }
@@ -240,8 +263,12 @@ sub getFieldDefault {
     my $field = shift;
     my $code; my $response;
     ($code, $response) = $self->_doGnatsCmd("INPUTDEFAULT $field");
-    return $response; #TODO parse?
-    #FIXME what if not ok?
+    if ($self->_isCodeOK($code)) {
+        return $response;
+    } else {
+        $self->_markError($code, $response);
+        return undef;
+    } 
 }
 
 
@@ -252,6 +279,7 @@ sub resetServer {
     if ($self->_isCodeOK($code)) {
         return 1;
     } else {
+        $self->_markError($code, $response);
         return 0;
     }
 }
@@ -264,6 +292,7 @@ sub lockMainDatabase {
     if ($self->_isCodeOK($code)) {
         return 1;
     } else {
+        $self->_markError($code, $response);
         return 0;
     }
 }
@@ -275,6 +304,7 @@ sub unlockMainDatabase {
     if ($self->_isCodeOK($code)) {
         return 1;
     } else {
+        $self->_markError($code, $response);
         return 0;
     }
 }
@@ -289,6 +319,7 @@ sub lockPR {
     if ($self->_isCodeOK($code)) {
         return 1;  #XXX extract PR ?
     } else {
+        $self->_markError($code, $response);
         return 0;
     }
 }
@@ -301,16 +332,44 @@ sub unlockPR {
     if ($self->_isCodeOK($code)) {
         return 1;
     } else {
+        $self->_markError($code, $response);
         return 0;
     }
 }
 
 
-sub deletePR { #not impelemented
+sub deletePR { 
+    my $self = shift;
+    my $pr = shift;
+    my $code; my $response;
+    ($code, $response) = $self->_doGnatsCmd("DELETE $pr");
+    if ($self->_isCodeOK($code)) {
+        return 1;
+    } else {
+        $self->_markError($code, $response);
+        return 0;
+    }
 }
 
-sub checkPR {
+sub checkNewPR {
+    my $self = shift;
+    my $pr = shift;
+    my $code; my $response;
+    ($code, $response) = $self->_doGnatsCmd("CHEK intial");
+    if ($self->_isCodeOK($code)) {
+        ($code, $response) = $self->_doGnatsCmd("$pr\n.");
+        if ($self->_isCodeOK($code)) {
+            return 1;
+        } else {
+        $self->_markError($code, $response);
+        return 0;
+        }
+    } else {
+        $self->_markError($code, $response);
+        return 0;
+    }
 }
+
 
 sub setWorkingEmail {
     my $self = shift;
@@ -320,6 +379,7 @@ sub setWorkingEmail {
     if ($self->_isCodeOK($code)) {
         return 1;
     } else {
+        $self->_markError($code, $response);
         return 0;
     }
 }
@@ -337,9 +397,11 @@ sub replaceField {
         if ($self->_isCodeOK($code)) {
             return 1;
         } else {
+            $self->_markError($code, $response);
             return 0;
         } 
     } else {
+        $self->_markError($code, $response);
         return 0;
     }
 }
@@ -357,9 +419,11 @@ sub appendToField {
         if ($self->_isCodeOK($code)) {
             return 1;
         } else {
+            $self->_markError($code, $response);
             return 0;
         } 
     } else {
+        $self->_markError($code, $response);
         return 0;
     }
 }
@@ -383,9 +447,11 @@ sub submitPR {
         if ($self->_isCodeOK($code)) {
             return 1;
         } else {
+            $self->_markError($code, $response);
             return 0;
         }
     } else {
+        $self->_markError($code, $response);
         return 0;
     }
     
@@ -463,8 +529,10 @@ sub _list {
             push @rows, $self->_convertGnatsRecordToHashRef($row, @keyNames);
         }
         return @rows;
+    } else {
+        $self->_markError($code, $response);
+        return undef;
     }
-    #FIXME what if not ok?
 }
 
 
@@ -498,17 +566,29 @@ sub login {
     if ($self->_isCodeOK($code)) {
         return 1;
     } else {
+        $self->_markError($code, $response);
         return 0;
     } 
 }
 
+
+sub getErrorCode {
+    my $self = shift;
+    return $self->{errorCode};
+}
+
+sub getErrorMessage {
+    my $self = shift;
+    return $self->{errorMessage};
+}
 
 
 
 sub _doGnatsCmd {
     my $self = shift;
     my $cmd = shift;
-
+    
+    $self->_clearError();  
     print SOCK "$cmd\n";
     my $response = $self->_getGnatsdResponse();
     my $code;
@@ -601,6 +681,22 @@ sub _isCodeOK {
     } else {
         return 0;
     }
+}
+
+
+sub _clearError {
+    my $self = shift;
+    $self->{errorCode} = undef;
+    $self->{errorMessage} = undef;
+}
+
+
+sub _markError {
+    my $self = shift;
+    my $code = shift;
+    my $msg = shift;
+    $self->{errorCode} = $code;
+    $self->{errorMessage} = $msg;
 }
 
 
@@ -705,9 +801,8 @@ directly from the database.  See Net::Gnats::PR for more details.
   my @prNums = $g->query('Number>"12"', "Category=\"$thisCat\"");
   print "Found ". join(":",@prNums)." matching PRs \n";
 
-Pass a list (one is ok) of query expressions to query().  A list of PR 
-numbers of matching PRs is returned.  You can then pull out each PR as 
-described next.
+Pass a list  of query expressions to query().  A list of PR numbers of 
+matching PRs is returned.  You can then pull out each PR as described next.
 
 
 =head2 FETCHING A PR
@@ -728,6 +823,77 @@ a duplicate of the original PR object.
 
 
 =head1 METHOD DESCRIPTIONS
+
+
+=head2 new()
+
+=head2 connect()
+
+=head2 disconnect()
+
+=head2 getDBNames()
+
+=head2 listDatabases()
+
+=head2 listCategories()
+
+=head2 listSubmitters()
+
+=head2 listRepsonsible()
+
+=head2 listStates()
+
+=head2 listClasses()
+
+=head2 listFieldNames()
+
+=head2 getFieldType()
+
+=head2 getFieldTypeInfo()
+
+=head2 getFieldDesc()
+
+=head2 getFieldFlags()
+
+=head2 getFieldValidators()
+
+=head2 validateField()
+
+=head2 getFieldDefault()
+
+=head2 resetServer()
+
+=head2 lockMainDatabase()
+
+=head2 unlockMainDatabase()
+
+=head2 lockPR()
+
+=head2 unlockPR()
+
+=head2 deletePR()
+
+=head2 checkPR()
+
+=head2 setWorkingEmail()
+
+=head2 replaceField()
+
+=head2 appendToField()
+
+=head2 submitPR()
+
+=head2 getPRByNumber()
+
+=head2 expr()
+
+=head2 query()
+
+=head2 admv()
+
+=head2 login()
+ 
+
 
 
 

@@ -37,7 +37,7 @@ sub main{
         print "\n";
     }
     
-    #print "Making new PR\n";
+    print "Making new PR\n";
     my $newPR = Net::Gnats::PR->new();
     $newPR->setField("Submitter-Id","developer");
     $newPR->setField("Originator","mike");
@@ -46,7 +46,8 @@ sub main{
     $newPR->setField("Confidential","no");
     $newPR->setField("Severity","serious");
     $newPR->setField("Priority","low");
-    $newPR->setField("Category","MBZ");
+    $newPR->setField("Category","tom");
+    #$newPR->setField("Category","MBZ");
     $newPR->setField("Class","sw-bug");
     $newPR->setField("Quarter","first");
     $newPR->setField("Release","mbz.2.1");
@@ -54,11 +55,22 @@ sub main{
     $newPR->setField("Description","Something bad happened");
     $newPR->setField("How-To-Repeat","I dunno");
     $newPR->setField("Fix","Beats me");
+    
+    print "Checking new PR\n";
+    my $checkRC = $g->checkNewPR($newPR->asString());
+    if ($checkRC) {
+        print "Checked ok\n";
+    } else {
+        print "Check Failedk\n";
+        print $g->getErrorCode().": ".$g->getErrorMessage()."\n";
+    }
+
+
     #$g->submitPR($newPR);
 
 
     print "Searching for all PRs\n";
-    my @bugsNums = $g->query('Number>"12"');
+    my @bugsNums = $g->query('Number>"12"', 'Category="MBZ"');
     print "Found ". join(":",@bugsNums)."\n";     
  
 

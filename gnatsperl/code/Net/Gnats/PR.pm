@@ -87,7 +87,9 @@ sub asString {
     my $self = shift;
     my $stringRep="";
 
-    $stringRep.=">Number: ".$self->getNumber()."\n";
+    if (defined $self->getNumber() ) { # number first if exists
+        $stringRep.=">Number: ".$self->getNumber()."\n";
+    }
     foreach my $key (keys %{$self->{fields}}) {
         $stringRep .=">$key: ".$self->{fields}->{$key}."\n";
     }
@@ -101,10 +103,14 @@ sub setFromString {
 
     my @byFields = split /^>/m, $PRstring;
     
+    my $containsNumber = grep (/^Number/, @byFields);
+
     #get rid of lines  precedeing Number
-    while ($byFields[0] !~ /^Number/) {
-        #print "Dropping line |".$byFields[0]."|\n";
-        shift @byFields;
+    if ($containsNumber) {
+        while ($byFields[0] !~ /^Number/ ) {
+            #print "Dropping line |".$byFields[0]."|\n";
+            shift @byFields;
+        }
     }
     
     foreach my $line (@byFields) {
