@@ -25,7 +25,7 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT = qw(
     new	
 );
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 
 use strict;
