@@ -3,6 +3,7 @@ package Net::Gnats;
 require 5.005_62;
 use strict;
 use warnings;
+#use Data::Dumper;
 
 require Exporter;
 require Net::Gnats::PR;
@@ -23,7 +24,8 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 our @EXPORT = qw(
-    new	
+                 new
+                 debugGnatsd
 );
 our $VERSION = '0.05';
 
@@ -33,6 +35,12 @@ use Carp;
 use Socket;
 use IO::Handle;
 
+our $debugGnatsd = 0;
+
+# There is a bug in gnatsd that seems to happen after submitting
+# about 125 new PR's in the same session it starts thinking that
+# the submitter-id is not valid anymore, so we restart every so often.
+my $maxNewPRs = 100;
 
 #******************************************************************************
 # Sub: new
@@ -41,7 +49,7 @@ use IO::Handle;
 # Returns: self
 #******************************************************************************
 sub new 
-{   
+{
     my $proto = shift;
     my $class = ref($proto) || $proto;
     my $self = {};
@@ -53,19 +61,29 @@ sub new
     $port = "1529" if not defined $port;
     $self->{hostAddr} = $host;
     $self->{hostPort} = $port;
-    
-    $self->{fieldNames} = undef;
-    
+
+    $self->{fieldData} = {
+                          # Array of fieldnames in same order
+                          # returned by list fieldnames.
+                          names => [],
+                          # Initial Input Fields
+                          initial => [],
+                          # All the field info.
+                          fields => {},
+                         };
+
     $self->{lastCode} = undef;
     $self->{lastResponse} = undef;
     $self->{errorCode} = undef;
     $self->{errorMessage} = undef;
     $self->{accessMode} = undef;
     $self->{gnatsdVersion} = undef;
+    $self->{user} = undef;
+    $self->{db}   = undef;
+
     return $self;
 
 }
-
 
 sub connect {
     my $self = shift;
@@ -82,12 +100,12 @@ sub connect {
     $paddr = sockaddr_in($self->{hostPort}, $iaddr);
     $proto = getprotobyname('tcp');
     if(!socket(SOCK, PF_INET, SOCK_STREAM, $proto)) {
-        warn("gnatsweb: client_init error: $!");
+        warn("gnatsweb: client_init error $self->{hostAddr} $self->{hostPort}: $!");
         return 0;
     }
     if(!connect(SOCK, $paddr))
     {
-        warn("gnatsweb: client_init error: $! ;");
+        warn("gnatsweb: client_init error $self->{hostAddr} $self->{hostPort}: $! ;");
         return 0;
     }
     SOCK->autoflush(1);
@@ -108,6 +126,7 @@ sub connect {
       warn "? Error: GNATS Daemon version $self->{gnatsdVersion} at $self->{hostAddr} $self->{hostPort} is not supported by Net::Gnats\n";
       return 0;
     }
+    $self->{newPRs} = 0;
     return 1;
 }
 
@@ -146,7 +165,7 @@ sub listDatabases {
 
 sub listCategories {
     my $self = shift;
-    my @cats = $self->_list("CATEGORIES", qw(name desc contact something));
+    my @cats = $self->_list("CATEGORIES", qw(name desc contact notify));
     return @cats;
 }
 
@@ -172,33 +191,64 @@ sub listStates {
 
 sub listClasses {
     my $self = shift;
+    die "Sorry 'LIST CLASSES' no longer supported by gnatsd.\n";
     my @cats = $self->_list("CLASSES", qw(name desc));
     return @cats;
 }
 
 sub listFieldNames {
-    my $self = shift;
-    my @cats = $self->_list("FIELDNAMES", qw(name));
-    return @cats;
+  my $self = shift;
+  if ($#{$self->{fieldData}->{names}} < 0) {
+    my ($code, $response) = $self->_doGnatsCmd("LIST FIELDNAMES");
+    if ($self->_isCodeOK($code)) {
+      push(@{$self->{fieldData}->{names}},$self->_extractListContent($response));
+    } else {
+      $self->_markError($code, $response);
+      return undef;
+    }
+  }
+  return wantarray ? @{$self->{fieldData}->{names}} : $self->{fieldData}->{names};
 }
 
 sub listInitialInputFields {
-    my $self = shift;
-    my @cats = $self->_list("INITIALINPUTFIELDS", qw(name));
-    return @cats;
+  my $self = shift;
+  if ($#{$self->{fieldData}->{initial}} < 0) {
+    my ($code, $response) = $self->_doGnatsCmd("LIST INITIALINPUTFIELDS");
+    if ($self->_isCodeOK($code)) {
+      push(@{$self->{fieldData}->{initial}},$self->_extractListContent($response));
+    } else {
+      $self->_markError($code, $response);
+      return undef;
+    }
+  }
+  return wantarray ? @{$self->{fieldData}->{initial}} : $self->{fieldData}->{initial};
 }
 
 sub getFieldType {
-    my $self = shift;
-    my $field = shift;
-    my $code; my $response;
-    ($code, $response) = $self->_doGnatsCmd("FTYP $field");
+  my $self = shift;
+  my $field = shift;
+  #print "--> getFieldType field='$field'\n" if $debugGnatsd;
+  if (not exists($self->{fieldData}->{fields}->{$field}->{type})) {
+    my ($code, $response) = $self->_doGnatsCmd("FTYP $field");
     if ($self->_isCodeOK($code)) {
-        return $response;
+      $response =~ s/^[0-9]+\s+//;
+      chomp $response;
+      $self->{fieldData}->{fields}->{$field}->{type} = $response;
     } else {
-        $self->_markError($code, $response);
-        return undef;
+      $self->_markError($code, $response);
+      return undef;
     }
+  }
+  return $self->{fieldData}->{fields}->{$field}->{type};
+}
+
+sub isValidField {
+  my $self = shift;
+  my $field = shift;
+  #print "--> isValidField field='$_[1]'\n" if $debugGnatsd;
+  $self->{validFields}->{$field} = $self->getFieldType($field) ? 1 : 0
+    if (not exists($self->{validFields}->{$field}));
+  return $self->{validFields}->{$field};
 }
 
 sub getFieldTypeInfo { 
@@ -206,13 +256,16 @@ sub getFieldTypeInfo {
     my $field = shift;
     my $property = shift;
     my $code; my $response;
-    ($code, $response) = $self->_doGnatsCmd("FTYPINFO $field $property");
-    if ($self->_isCodeOK($code)) {
-        return $response;
-    } else {
+    if (not exists($self->{fieldData}->{fields}->{$field}->{typeInfo})) {
+      ($code, $response) = $self->_doGnatsCmd("FTYPINFO $field $property");
+      if ($self->_isCodeOK($code)) {
+        $self->{fieldData}->{fields}->{$field}->{typeInfo} = $response;
+      } else {
         $self->_markError($code, $response);
         return undef;
+      }
     }
+    return $self->{fieldData}->{fields}->{$field}->{typeInfo};
 }
 
 
@@ -232,13 +285,24 @@ sub getFieldDesc {
 sub getFieldFlags {
     my $self = shift;
     my $field = shift;
+    my $flag  = shift;
     my $code; my $response;
-    ($code, $response) = $self->_doGnatsCmd("FIELDFLAGS $field");
-    if ($self->_isCodeOK($code)) {
-        return $response;
-    } else {
+    if (not exists($self->{fieldData}->{fields}->{$field}->{flags})) {
+      ($code, $response) = $self->_doGnatsCmd("FIELDFLAGS $field");
+      if ($self->_isCodeOK($code)) {
+        $self->{fieldData}->{fields}->{$field}->{flags} = $response;
+      } else {
         $self->_markError($code, $response);
         return undef;
+      }
+    }
+    if ($flag) {
+      foreach my $f ( split(" ",$self->{fieldData}->{fields}->{$field}->{flags}) ) {
+        return 1 if (lc($f) eq lc($flag));
+      }
+      return 0;
+    } else {
+      return $self->{fieldData}->{fields}->{$field}->{flags};
     }
 }
 
@@ -278,16 +342,21 @@ sub validateField {
 }
 
 sub getFieldDefault {
-    my $self = shift;
-    my $field = shift;
-    my $code; my $response;
-    ($code, $response) = $self->_doGnatsCmd("INPUTDEFAULT $field");
+  my $self = shift;
+  my $field = shift;
+
+  if (not exists($self->{fieldData}->{fields}->{$field}->{default})) {
+    my ($code, $response) = $self->_doGnatsCmd("INPUTDEFAULT $field");
     if ($self->_isCodeOK($code)) {
-        return $response;
+      chomp($response);
+      $response =~ s/^350\s//;
+      $self->{fieldData}->{fields}->{$field}->{default} = $response;
     } else {
-        $self->_markError($code, $response);
-        return undef;
-    } 
+      $self->_markError($code, $response);
+      return undef;
+    }
+  }
+  return $self->{fieldData}->{fields}->{$field}->{default};
 }
 
 
@@ -328,7 +397,6 @@ sub unlockMainDatabase {
     }
 }
 
-
 sub lockPR {
     my $self = shift;
     my $pr = shift;
@@ -336,7 +404,9 @@ sub lockPR {
     my $code; my $response;
     ($code, $response) = $self->_doGnatsCmd("LOCK $pr $user");
     if ($self->_isCodeOK($code)) {
-        return 1;  #XXX extract PR ?
+        my $prl = $self->newPR();
+        $prl->parse(split("\n",$response));
+        return $prl;
     } else {
         $self->_markError($code, $response);
         return 0;
@@ -371,17 +441,32 @@ sub deletePR {
 }
 
 sub checkNewPR {
+  $_[0]->checkPR($_[1],"initial");
+}
+
+sub checkPR {
     my $self = shift;
-    my $pr = shift;
+    my $pr   = shift;
+    my $arg  = defined($_[0]) ? $_[0] : "";
     my $code; my $response;
-    ($code, $response) = $self->_doGnatsCmd("CHEK initial");
+    ($code, $response) = $self->_doGnatsCmd("CHEK $arg");
     if ($self->_isCodeOK($code)) {
         ($code, $response) = $self->_doGnatsCmd("$pr\n.");
         if ($self->_isCodeOK($code)) {
             return 1;
         } else {
-        $self->_markError($code, $response);
-        return 0;
+          # TODO: Should this be handled in _doGnatsCmd?
+          # If gnatsd returns a: 401 Couldn't read PR header
+          # or if it sends multiple: 411 There is a bad value ... for field ...
+          # then it also sends a: 403 Errors found checking PR text
+          # So read back that response, but ignore it cause the user
+          # would want to see the 401 error
+          my @response = split("\n",$response);
+          if ($code eq "401" or ($code eq "411" and $#response > 0)) {
+            my ($rcode, $rresponse) = $self->_readAndProcessResponse();
+          }
+          $self->_markError($code, $response);
+          return 0;
         }
     } else {
         $self->_markError($code, $response);
@@ -415,41 +500,68 @@ sub replaceField {
     my $reason = shift;
     my $code; my $response;
     #
+    confess "? Error: pr not passed to replaceField" if (not defined($pr));
+    confess "? Error: field passed to replaceField" if (not defined($field));
     confess "? Error: no input passed to replaceField" if (not defined($input));
     # See if this field requires a change reason.
     # TODO: We could just enter the $input, and see if gnatsd says
     #       a reason is required, but I could not figure out how to
     #       abort at that point if no reason was given...
-    my $fieldFlags   = $self->getFieldFlags($field);
-    my $needReason = 0;
-    foreach my $f ( split(" ",$fieldFlags) ) {
-      if (lc($f) eq "requirechangereason") {
-        $needReason = 1;
-        if (not defined($reason) or $reason eq "") {
-          $self->_markError("???","No change Reason Specified");
-          return(0);
-        }
-      }
+    my $needReason = $self->getFieldFlags($field,"requireChangeReason");
+    if ($needReason and (not defined($reason) or $reason eq "")) {
+      $self->_markError("403","No change Reason Specified");
+      return(0);
     }
     ($code, $response) = $self->_doGnatsCmd("REPL $pr $field");
     if ($self->_isCodeOK($code)) {
         ($code, $response) = $self->_doGnatsCmd($input."\n".".");
         if ($needReason) {
-          warn "reason=\"$reason\"";
+          #warn "reason=\"$reason\"";
+          # TODO: This can choke here if we encounter a PR with a bad field like:
+          # _getGnatsdResponse: READ >>411 There is a bad value `unknown' for the field `Category'.
           ($code, $response) = $self->_doGnatsCmd($reason."\n".".")
         }
         if ($self->_isCodeOK($code)) {
             return 1;
         } else {
             $self->_markError($code, $response);
-            return 0;
-        } 
+            #return 0;
+        }
     } else {
         $self->_markError($code, $response);
-        return 0;
+        #return 0;
     }
+    if ($code eq "640") {
+      if ($self->restart($code)) {
+        # TODO: This can potentially be an infinte loop...
+        return $self->replaceField($pr,$field,$input,$reason);
+      }
+    }
+    return 0;
 }
 
+my $restartTime;
+sub restart {
+  my $self = shift;
+  my $code = shift;
+  my $ctime = time;
+  if (defined($restartTime)) {
+    if (($ctime - $restartTime) < 5) {
+      warn "! ERROR: Restart attempted twice in a row, 640 error must be real!\n";
+      return 0;
+    }
+  }
+  warn "
+! ERROR: Recieved GNATSD code $code, will now disconnect and reconnect
+         to gnatsd, then re-issue the command.  This may cause any
+         following commands to behave differently if you depended on
+         things like QFMT\n".time."\n";
+  $restartTime = $ctime;
+  $self->_clearError();
+  $self->disconnect;
+  $self->connect;
+  return $self->login($self->{db},$self->{user},$self->{pass});
+}
 
 sub appendToField {
     my $self = shift;
@@ -457,6 +569,9 @@ sub appendToField {
     my $field = shift;
     my $input = shift;
     my $code; my $response;
+    confess "? Error: pr not passed to appendField" if (not defined($pr));
+    confess "? Error: field passed to appendField" if (not defined($field));
+    confess "? Error: no input passed to appendField" if (not defined($input));
     ($code, $response) = $self->_doGnatsCmd("APPN $pr $field");
     if ($self->_isCodeOK($code)) {
         ($code, $response) = $self->_doGnatsCmd($input."\n".".");
@@ -464,55 +579,125 @@ sub appendToField {
             return 1;
         } else {
             $self->_markError($code, $response);
-            return 0;
         } 
     } else {
         $self->_markError($code, $response);
-        return 0;
     }
+    if ($code eq "640") {
+      if ($self->restart($code)) {
+        # TODO: This can potentially be an infinte loop...
+        return $self->appendToField($pr,$field,$input);
+      }
+    }
+    return 0;
 }
-
 
 sub submitPR {
     my $self = shift;
     my $pr = shift;
-    
-    my %prHash = $pr->asHash();
-    my $prString;
-    foreach my $key (qw(From Reply-To)) {
-      if ($prHash{$key}) {
-        $prString .= "$key: $prHash{$key}\n";
-      }
-    }
-    foreach my $key (keys %prHash) {
-        #print "Adding line| >$key: ".$prHash{$key}."\n";
-      if (not (lc($key) eq "from" or lc($key) eq "reply-to")) {
-        $prString .= ">$key: ".$prHash{$key}."\n";
-      }
-    }
+
+    $self->restart("To Many New PR's") if ($self->{newPRs} > $maxNewPRs);
+
+    my $prString = $pr->unparse();
 
     my $code; my $response;
     ($code, $response) = $self->_doGnatsCmd("SUBM");
     if ($self->_isCodeOK($code)) {
         ($code, $response) = $self->_doGnatsCmd($prString."\n".".");
+        warn "Gnats::submitPR: code=$code response=$response" if $debugGnatsd;
         if ($self->_isCodeOK($code)) {
-            return 1;
+          $self->{newPRs}++;
+          return 1;
         } else {
             $self->_markError($code, $response);
-            return 0;
         }
     } else {
         $self->_markError($code, $response);
-        return 0;
     }
-    
-    
+    if ($code eq "640") {
+      if ($self->restart($code)) {
+        # TODO: This can potentially be an infinte loop...
+        return $self->submitPR($pr);
+      }
+    }
+    return 0;
+}
+
+##################################################################
+#
+# Update the PR.
+#
+# Bit's of this code were grabbed from "gnatsweb.pl".
+#
+sub updatePR {
+    my $self = shift;
+    my $pr = shift;
+    my $user         = $self->{user};
+    my $prNum        = $pr->getField("Number");
+    my $lastModified = $pr->getField("Last-Modified");
+    $lastModified ||= ''; # Default to empty
+
+    my $prString = $pr->unparse("gnatsd");
+
+    my $code; my $response ; my $st = 0;
+    # Lock the PR so we can edit it.
+    # Locking it returns the PR contents which we use to see what has changed.
+    if (my $spr = $self->lockPR($prNum,$user)) {
+      # See which fields changed.
+      my %sprHash = $spr->asHash();
+      $sprHash{'Last-Modified'} ||= ''; # Default to empty
+      # Make sure modified date is the same!
+      my $slastModified = $spr->getField("Last-Modified");
+      $slastModified ||= ''; # Default to empty
+      if ($lastModified ne $slastModified) {
+        $code = "433"; # What code to return?  433=PR_NOT_LOCKED
+        $response = "433 Sorry can't edit $prNum, it has been modified by someone else";
+      } else {
+        my $prString = $pr->unparse("gnatsd");
+        # Now edit it.
+        if (not $code) {
+          ($code, $response) = $self->_doGnatsCmd("EDITADDR $user");
+          if ($self->_isCodeOK($code)) {
+            ($code, $response) = $self->_doGnatsCmd("EDIT $prNum");
+            if ($self->_isCodeOK($code)) {
+              ($code, $response) = $self->_doGnatsCmd($prString.".");
+              if ($self->_isCodeOK($code)) {
+                $st = 1; # Everything worked!
+              }
+            }
+          }
+        }
+      }
+      # TODO: Detect unlock PR problems?
+      # Seems that unlock sometimes returns a 6xx code even if the lock file is removed? 
+      $self->unlockPR($prNum); 
+      if (not $st) {
+        # Something above failed, mark the error.
+        $self->_markError($code, $response);
+      }
+    }
+    return $st;
+
 }
 
 
+sub newPR {
+  my $self = shift;
+  return Net::Gnats::PR->new($self);
+}
+
+# Fillout all defaults for a PR.
+# TODO: should this always be called by newPR?
+sub filloutPR {
+  my $self = shift;
+  my $pr   = shift;
+  foreach my $field ($self->listInitialInputFields) {
+    $pr->setField($field,$self->getFieldDefault($field));
+  }
+}
 
 
-sub getPRByNumber { 
+sub getPRByNumber {
     my $self = shift;
     my $num = shift;
 
@@ -534,8 +719,9 @@ sub getPRByNumber {
         return undef;
     }
 
-    my $pr = Net::Gnats::PR->new();
-    $pr->setFromString($response);
+    my $pr = $self->newPR();
+    #$pr->setFromString($response);
+    $pr->parse(split("\n",$response));
     
     return $pr; 
 }
@@ -594,7 +780,6 @@ sub admv { #???
 
 
 
-
 sub _list {
     my $self = shift;
     my $listType = shift;
@@ -646,6 +831,9 @@ sub login {
 
     ($code, $response) = $self->_doGnatsCmd("CHDB $db $user $pass");
     if ($self->_isCodeOK($code)) {
+        $self->{db}   = $db;
+        $self->{user} = $user;
+        $self->{pass} = $pass;
         $self->_setAccessMode; # Set the access mode.
         return 1;
     } else {
@@ -692,26 +880,32 @@ sub getErrorMessage {
 
 
 sub _doGnatsCmd {
-    my $self = shift;
-    my $cmd = shift;
-    
-    $self->_clearError();  
-    #print "_doGnatsCmd sending: $cmd\n";
-    print SOCK "$cmd\n";
-    my $response = $self->_getGnatsdResponse();
-    #print "received |$response|\n";
+  my $self = shift;
+  my $cmd = shift;
 
-    my $bugstring="411 There is a bad value";
-    <SOCK> if $response =~/^$bugstring/;
+  $self->_clearError();
+  print "_doGnatsCmd: sending: |$cmd|\n" if $debugGnatsd;
+  print SOCK "$cmd\n";
+  my ($code, $response) = $self->_readAndProcessResponse();
+  return ($code, $response);
+}
 
-    my $code;
-    $code = $self->_extractResponseCode($response);
-    $self->{lastCode} = $code;
-    $self->{lastResponse} = $response;
-    
-    #print "CODE $code: $response\n";
-    return ($code, $response);
-    
+sub _readAndProcessResponse {
+  my $self = shift;
+
+  my $response = $self->_getGnatsdResponse();
+  print "_doGnatsCmd: received |$response|\n" if $debugGnatsd;
+
+  my $bugstring="411 There is a bad value";
+  <SOCK> if $response =~/^$bugstring/;
+
+  my $code;
+  $code = $self->_extractResponseCode($response);
+  $self->{lastCode} = $code;
+  $self->{lastResponse} = $response;
+
+  print "_doGnatsCmd: CODE $code: $response\n" if $debugGnatsd;
+  return ($code, $response);
 }
 
 sub _getGnatsdResponse
@@ -721,18 +915,25 @@ sub _getGnatsdResponse
     my $isMultiLineResponse = 0;
 
     while  (1) {
+        print "_getGnatsdResponse: Reading...\n" if $debugGnatsd;
         my $line = <SOCK>;
         
-        #print "READ >>$line<<\n";
+        print "_getGnatsdResponse: READ >>$line<<\n" if $debugGnatsd;;
 
         #if response code is in 300-399 range, then go until "." line
-        if ($line =~ /^3\d\d / and (not $line =~ /^350 /)) {
+        if (defined $line) {
+          my ($code,$rest) = split(" ",$line);
+          if ($code >= 300 and $code < 350) {
             $isMultiLineResponse = 1;
-        } elsif ($isMultiLineResponse and $line =~/^\.\r/) {
-            push @lines, ".\n";
-            last; 
+          } elsif ($isMultiLineResponse and $line =~/^\.\r/) {
+            #push @lines, ".\n";  # Why did it remember this !?!? nobody should want this...
+            last;
+          }
+        } else {
+          last;
         }
-        #print "imlr = $isMultiLineResponse\n";
+        
+        print "_getGnatsdResponse: isMultiLineResponse=$isMultiLineResponse\n" if $debugGnatsd;
         
         # Lines which begin with a '.' are escaped by gnatsd with another '.'
         $line =~ s/^\.\././;
@@ -772,14 +973,23 @@ sub _extractResponseCode {
 sub _extractListContent {
     my $self = shift;
     my $response = shift;
-
-    my @lines = split /\r\n/, $response;
+    $response =~ s/\r//g;
+    my @lines = split /\n/, $response;
     shift @lines; # first item is the response message
-    pop @lines; #last item is the "."
     return @lines;
 }
-    
 
+sub _escapeMultiText {
+  my $self = shift;
+  my $text = shift;
+  $text =~ s/^[.]/../gm;
+  # If there is any text, make sure it ends with a newline.
+  if ($text ne "") {
+    chomp($text);
+    $text .= "\n";
+  }
+  return $text;
+}
 
 
 
@@ -832,9 +1042,24 @@ Net::Gnats - Perl interface to GNU Gnats daemon
   $g->connect();
   my @dbNames = $g->getDBNames();
   $g->login("default","somedeveloper","password");
+
   my $PRtwo = $g->getPRByNumber(2);
   print $PRtwo->asString();
-  my $newPR = Net::Gnats::PR->new();
+  # Change the synopsis
+  $PRtwo->replaceField("Synopsis","The New Synopsis String");
+  # Change the responsible, which requires a change reason.
+  $PRtwo->replaceField("Responsible","joe","Because It's Joe's");
+
+  # Or we can change them this way.
+  my $PRthree = $g->getPRByNumber(3);
+  # Change the synopsis
+  $PRtwo->setField("Synopsis","The New Synopsis String");
+  # Change the responsible, which requires a change reason.
+  $PRtwo->setField("Responsible","joe","Because It's Joe's");
+  # And change the PR in the database
+  $g->updatePR($pr);
+
+  my $newPR = $g->newPR();
   $newPR->setField("Submitter-Id","developer");
   $g->submitPR($newPR);
   $g->disconnect();
@@ -883,7 +1108,7 @@ The Net::Gnats::PR object acts as a container object to store information
 about a PR (new or otherwise).  A new PR is submitted to gnatsperl by 
 constructing a PR object.
 
-  my $newPR = Net::Gnats::PR->new();
+  my $newPR = $g->newPR();
   $newPR->setField("Submitter-Id","developer");
   $newPR->setField("Originator","Doctor Wifflechumps");
   $newPR->setField("Organization","GNU");
@@ -933,6 +1158,36 @@ returns a string in the proper Gnats format, and can therefore be submitted
 directly to Gnats via email or saved to the db directory for instance.  Also,
 $newPR->setFromString( $oldPR->asString() ) works fine and will result in 
 a duplicate of the original PR object.
+
+
+=head2 MODIFYING A PR
+
+There are 2 methods of modifying fields in a Net::Gnats::PR object.
+
+The first is to use the replaceField() or appendField() methods which uses the
+gnatsd REPL and APPN commands.  This means that the changes to the database happen
+immediatly.
+
+  my $prnum = 23;
+  my $PR = $g->getPRByNumber($prnum);
+  if (! $PR->replaceField('Synopsis','New Synopsis')) {
+    warn "Error replaceing field (",$g->getErrorMessage,")\n";
+  }
+
+If the field requires a change reason, it must be supplied as the 3rd argument.
+  $PR->replaceField('Responsible','joe',"It's joe's problem");
+
+The second is to use the setField() and updatePR() methods which uses the gnatsd
+EDIT command.  This should be used when multiple fields of the same PR are being
+changed, since the datbase changes occur at the same time.
+
+  my $prnum = 23;
+  my $PR = $g->getPRByNumber($prnum);
+  $PR->setField('Synopsis','New Synopsis');
+  $PR->setField('Responsible','joe',"It's joe's problem");
+  if (! $g->updatePR($PR) ) {
+    warn "Error updating $prNum: ",$g->getErrorMessage,"\n";
+  }
 
 
 =head1 HANDLING ERRORS
@@ -1092,6 +1347,9 @@ if field successfully replaced, false otherwise.
 If the field has requireChangeReason attribute, then the changeReason must
 be passed in, otherwise the routine will return false.
 
+replaceField changes happen immediatly in the database.  To change multiple
+fields in the same PR it is more efficiant to use updatePR.
+
 =head2 appendToField()
 
 Expects a PR number, a fieldname, and a append value as arguments, and
@@ -1102,6 +1360,13 @@ false otherwise.
 
 Expect a Gnats::PR object as sole argument, and issues the SUMB command.  
 Returns true if PR successfully submitted, false otherwise.
+
+=head2 updatePR()
+
+Expect a Gnats::PR object as sole argument, and issues the EDIT command.
+Returns true if PR successfully submitted, false otherwise.
+
+Use this instead of replaceField if more than one field has changed.
 
 =head2 getPRByNumber()
 
