@@ -25,7 +25,7 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT = qw(
     new	
 );
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 
 use strict;
@@ -60,7 +60,8 @@ sub new
     $self->{lastResponse} = undef;
     $self->{errorCode} = undef;
     $self->{errorMessage} = undef;
-
+    $self->{accessMode} = undef;
+    $self->{gnatsdVersion} = undef;
     return $self;
 
 }
@@ -90,7 +91,23 @@ sub connect {
         return 0;
     }
     SOCK->autoflush(1);
-    $self->_getGnatsdResponse();
+    my $response = $self->_getGnatsdResponse();
+    my $code     = $self->_extractResponseCode($response);
+    $self->{lastCode} = $code;
+    $self->{lastResponse} = $response;
+    # Make sure we got a 200 code.
+    if ($code != 200) {
+      warn "? Error: Unknown gnatsd connection response: $response";
+      return 0;
+    }
+    # Grab the gnatsd version
+    $response =~ s/.*GNATS\s+server\s+(\S+)\s+.*/$1/;
+    $self->{gnatsdVersion} = $1;
+    # We only know how to talk to gnats4
+    if (not $self->{gnatsdVersion} =~ /^4/) {
+      warn "? Error: GNATS Daemon version $self->{gnatsdVersion} at $self->{hostAddr} $self->{hostPort} is not supported by Net::Gnats\n";
+      return 0;
+    }
     return 1;
 }
 
@@ -386,16 +403,41 @@ sub setWorkingEmail {
     }
 }
 
-
+#
+# TODO: "text" fields are limited to 256 characters.  Current gnatsd does
+# not correctly truncate, if you enter $input is 257 characters, it will
+# replace with an empty field.  We should truncate text $input's correctly.
 sub replaceField {
     my $self = shift;
     my $pr = shift;
     my $field = shift;
     my $input = shift;
+    my $reason = shift;
     my $code; my $response;
+    #
+    confess "? Error: no input passed to replaceField" if (not defined($input));
+    # See if this field requires a change reason.
+    # TODO: We could just enter the $input, and see if gnatsd says
+    #       a reason is required, but I could not figure out how to
+    #       abort at that point if no reason was given...
+    my $fieldFlags   = $self->getFieldFlags($field);
+    my $needReason = 0;
+    foreach my $f ( split(" ",$fieldFlags) ) {
+      if (lc($f) eq "requirechangereason") {
+        $needReason = 1;
+        if (not defined($reason) or $reason eq "") {
+          $self->_markError("???","No change Reason Specified");
+          return(0);
+        }
+      }
+    }
     ($code, $response) = $self->_doGnatsCmd("REPL $pr $field");
     if ($self->_isCodeOK($code)) {
         ($code, $response) = $self->_doGnatsCmd($input."\n".".");
+        if ($needReason) {
+          warn "reason=\"$reason\"";
+          ($code, $response) = $self->_doGnatsCmd($reason."\n".".")
+        }
         if ($self->_isCodeOK($code)) {
             return 1;
         } else {
@@ -437,9 +479,16 @@ sub submitPR {
     
     my %prHash = $pr->asHash();
     my $prString;
+    foreach my $key (qw(From Reply-To)) {
+      if ($prHash{$key}) {
+        $prString .= "$key: $prHash{$key}\n";
+      }
+    }
     foreach my $key (keys %prHash) {
         #print "Adding line| >$key: ".$prHash{$key}."\n";
+      if (not (lc($key) eq "from" or lc($key) eq "reply-to")) {
         $prString .= ">$key: ".$prHash{$key}."\n";
+      }
     }
 
     my $code; my $response;
@@ -501,24 +550,24 @@ sub expr {
         ($code, $response) = $self->_doGnatsCmd("EXPR $expr");
     }
     return $code; #XXX TODO and codes together or abort or something
-} 
+}
 
 sub query { 
     my $self = shift;
     my @exprs = @_;
-   
+
     my ($code, $response) = $self->_doGnatsCmd("RSET"); #XXX TODO  
     if (not $self->_isCodeOK($code)) {
         $self->_markError($code, $response);
         return undef;
     }
-    
+
     ($code, $response) = $self->_doGnatsCmd("QFMT Number"); #XXX TODO  
     if (not $self->_isCodeOK($code)) {
         $self->_markError($code, $response);
         return undef;
     }
-    
+
     foreach my $expr (@exprs) {
         ($code, $response) = $self->_doGnatsCmd("EXPR $expr"); 
         if (not $self->_isCodeOK($code)) {
@@ -596,11 +645,36 @@ sub login {
 
     ($code, $response) = $self->_doGnatsCmd("CHDB $db $user $pass");
     if ($self->_isCodeOK($code)) {
+        $self->_setAccessMode; # Set the access mode.
         return 1;
     } else {
         $self->_markError($code, $response);
         return 0;
     } 
+}
+
+sub getAccessMode {
+    my $self = shift;
+    return $self->{accessMode};
+}
+
+# This is called by login to determine the currrent access mode, typically
+# this would not be called by the user.
+sub _setAccessMode {
+    my $self = shift;
+    my $code;
+    my $response;
+    $self->{accessMode} = undef; # Clear it.
+    ($code, $response) = $self->_doGnatsCmd("USER");
+    if ($self->_isCodeOK($code)) {
+        $response =~ s/.*\n350\s*(\S+)\s*\n/$1/;
+        $self->{accessMode} = $response;
+        #warn "accessMode = \"$self->{accessMode}\".\n";
+        return $response;
+    } else {
+        $self->_markError($code, $response);
+        return 0;
+    }
 }
 
 
@@ -621,7 +695,7 @@ sub _doGnatsCmd {
     my $cmd = shift;
     
     $self->_clearError();  
-    #print "sending |$cmd\n|\n";
+    #print "_doGnatsCmd sending: $cmd\n";
     print SOCK "$cmd\n";
     my $response = $self->_getGnatsdResponse();
     #print "received |$response|\n";
@@ -651,23 +725,23 @@ sub _getGnatsdResponse
         #print "READ >>$line<<\n";
 
         #if response code is in 300-399 range, then go until "." line
-        if ($line =~ /^3\d\d /) {
+        if ($line =~ /^3\d\d / and (not $line =~ /^350 /)) {
             $isMultiLineResponse = 1;
         } elsif ($isMultiLineResponse and $line =~/^\.\r/) {
             push @lines, ".\n";
             last; 
         }
-
+        #print "imlr = $isMultiLineResponse\n";
+        
         # Lines which begin with a '.' are escaped by gnatsd with another '.'
         $line =~ s/^\.\././;
         
         push @lines, $line; #add current line to the list of response lines
 
         # a line that ends "\d\d\d " is a last line
-        if ($line =~ /^(\d)\d\d .*/) {
-            if ($1!=3) { #unless it's 3xx, then more data is coming
-                last;
-            }
+        if ($line =~ /^((\d)\d\d) .*/ and not $isMultiLineResponse) {
+            #if ($1 != 3 or $2 == 350) { #unless it's 3xx, then more data is coming
+            last;
         }
     }
     my $allLines = join ("", @lines);  
@@ -687,7 +761,7 @@ sub _extractResponseCode {
     if ($response =~ /^(\d\d\d)( |-)/s) {
         $code = $1;
     } else {
-        warn "Could not parse gnatsd response\n";
+        warn "Could not parse gnatsd response \"$response\"";
         return undef; #FIXME a little better here    
     }
   
@@ -713,12 +787,13 @@ sub _extractListContent {
 sub _isCodeOK {
     my $self = shift;
     my $code = shift;
-
+  if (defined($code)) {
     if (($code =~ /2\d\d/) or ($code =~ /3\d\d/)) {
         return 1;
     } else {
         return 0;
     }
+  }
 }
 
 
@@ -1009,9 +1084,12 @@ Returns true if email successfully set, false otherwise.
 
 =head2 replaceField()
 
-Expects a PR number, a fieldname, and a replacement value as arguments, and
-issues the REPL command.  Returns true if field successfully replaced, 
-false otherwise.
+Expects a PR number, a fieldname, a replacement value, and optionally a
+changeReason value as arguments, and issues the REPL command.  Returns true
+if field successfully replaced, false otherwise.
+
+If the field has requireChangeReason attribute, then the changeReason must
+be passed in, otherwise the routine will return false.
 
 =head2 appendToField()
 
@@ -1038,6 +1116,9 @@ PR numbers.
 Expects a database name, user name, and password as arguments and issues the 
 CHDB command.  Returns true if successfully logged in, false otherwise
 
+=head2 getAccessMode()
+
+Returns the current access mode of the gnats database.  Either "edit", "view", or undef;
 
 =head1 BUGS
 
@@ -1048,9 +1129,9 @@ Bug reports are very welcome.  Please submit to the project page
 =head1 AUTHOR
 
 Mike Hoolehan, <lt>mike@sycamore.us<gt>
+Changes by:
+Jim Searle, <lt>jims2@cox.net<gt>
 Project hosted at sourceforge, at http://gnatsperl.sourceforge.net
-
-
 
 =head1 COPYRIGHT
 
