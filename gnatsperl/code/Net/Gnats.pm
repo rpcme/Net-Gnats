@@ -639,7 +639,8 @@ sub login {
     my $db = shift;
     my $user = shift;
     my $pass = shift;
-    
+    $pass = '*' if (not defined($pass) or $pass eq '');
+
     my $code;
     my $response;
 
