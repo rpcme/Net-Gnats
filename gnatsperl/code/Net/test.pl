@@ -21,7 +21,7 @@ print "ok 1\n";
 print "\nNote: remaining tests will fail if gnatsd is not\n".
       "running on localhost:1529\n\n";
 
-my $g = Net::Gnats->new("sdflskjdf");
+my $g = Net::Gnats->new();
 my $connected;
 
 if ($g->connect()) {
