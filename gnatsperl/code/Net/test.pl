@@ -18,3 +18,20 @@ print "ok 1\n";
 # (correspondingly "not ok 13") depending on the success of chunk 13
 # of the test code):
 
+
+my $g = Net::Gnats->new();
+if ($g->connect()) {
+    print "ok 2\n";
+} else {
+    print "not ok 2\n";
+}
+
+if (defined $g->listDatabases()) {
+    print "ok 3\n";
+} else {
+    print "not ok 3\n";
+}
+    
+
+
+

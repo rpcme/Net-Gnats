@@ -75,21 +75,22 @@ sub connect {
 
     if (!($iaddr = inet_aton($self->{hostAddr}))) {
         print("Unknown GNATS host '$self->{hostAddr}'");
-        exit();
+        return 0;
     }
     $paddr = sockaddr_in($self->{hostPort}, $iaddr);
     $proto = getprotobyname('tcp');
     if(!socket(SOCK, PF_INET, SOCK_STREAM, $proto)) {
         warn("gnatsweb: client_init error: $!". print_stacktrace());
-        exit();
+        return 0;
     }
     if(!connect(SOCK, $paddr))
     {
         warn("gnatsweb: client_init error: $! ;". print_stacktrace());
-        exit();
+        return 0;
     }
     SOCK->autoflush(1);
     $self->_getGnatsdResponse();
+    return 1;
 }
 
 
@@ -821,91 +822,204 @@ $newPR->setFromString( $oldPR->asString() ) works fine and will result in
 a duplicate of the original PR object.
 
 
+=head1 HANDLING ERRORS
+
+Most methods will return undef if a major error is encountered.  
+
+The most recent error codes and messages which Net::Gnats encounters while
+communcating with gnatsd are stored, and can be accessed with the 
+getErrorCode() and getErrorMessage() methods.   
+
 
 =head1 METHOD DESCRIPTIONS
 
 
 =head2 new()
 
+Constructor, optionally taking one or two arguments of hostname and port 
+of the target gnats server.  If not supplied, the hostname defaults to
+localhost and the port to 1529.
+
 =head2 connect()
+
+Connects to the gnats server.  No arguments.  Returns true if successfully
+connected, false otherwise.
+
 
 =head2 disconnect()
 
+Issues the QUIT command to the Gnats server, therby closing the connection.
+
 =head2 getDBNames()
+
+Issues the DBLS command, and returns a list of database names in the gnats
+server.  Unlike listDatabases, one does not need to use the logn method 
+before using this method.
 
 =head2 listDatabases()
 
+Issues the LIST DATABASES command, and returns a list of hashrefs with keys
+'name', 'desc', and 'path'.  
+
 =head2 listCategories()
+
+Issues the LIST CATEGORIES command, and returns a list of hashrefs with keys
+'name', 'desc', 'contact', and '?'.  
 
 =head2 listSubmitters()
 
+Issues the LIST SUBMITTERS command, and returns a list of hashrefs with keys
+'name', 'desc', 'contract', '?', and 'responsible'.  
+
 =head2 listRepsonsible()
+
+Issues the LIST RESPONSIBLE command, and returns a list of hashrefs with keys
+'name', 'realname', and 'email'.  
 
 =head2 listStates()
 
+Issues the LIST STATES command, and returns a list of hashrefs with keys
+'name', 'type', and 'desc'.  
+
 =head2 listClasses()
+
+Issues the LIST CLASSES command, and returns a list of hashrefs with keys
+'name', and 'desc'.  
 
 =head2 listFieldNames()
 
+Issues the LIST FIELDNAMES command, and returns a list of hashrefs with key
+'name'.
+
+=head2 listInitialInputFields()
+
+Issues the LIST INITIALINPUTFIELDS command, and returns a list of hashrefs 
+with key 'name'.
+
 =head2 getFieldType()
+
+Expects a fieldname as sole argument, and issues the FTYP command.  Returns
+text response or undef if error.
 
 =head2 getFieldTypeInfo()
 
+Expects a fieldname and property as arguments, and issues the FTYPINFO 
+command.  Returns text response or undef if error.
+
 =head2 getFieldDesc()
+
+Expects a fieldname as sole argument, and issues the FDSC command.  Returns
+text response or undef if error.
 
 =head2 getFieldFlags()
 
+Expects a fieldname as sole argument, and issues the FIELDFLAGS command.  
+Returns text response or undef if error.
+
 =head2 getFieldValidators()
+
+Expects a fieldname as sole argument, and issues the FVLD command.  Returns 
+text response or undef if error.
 
 =head2 validateField()
 
+Expects a fieldname and a proposed value for that field as argument, and 
+issues the VFLD command.  Returns true if propose value is acceptable, false
+otherwise.  
+
 =head2 getFieldDefault()
+
+Expects a fieldname as sole argument, and issues the INPUTDEFAULT command.  
+Returns text response or undef if error.
 
 =head2 resetServer()
 
+Issues the RSET command, returns true if successful, false otherwise.
+
 =head2 lockMainDatabase()
+
+Issues the LKDB command, returns true if successful, false otherwise.
 
 =head2 unlockMainDatabase()
 
+Issues the UNDB command, returns true if successful, false otherwise.
+
 =head2 lockPR()
+
+Expects a PR number and user name as arguments, and issues the LOCK 
+command.  Returns true if PR is successfully locked, false otherwise.  
 
 =head2 unlockPR()
 
+Expects a PR number a sole argument, and issues the UNLK command.  Returns 
+true if PR is successfully unlocked, false otherwise.  
+
 =head2 deletePR()
+
+Expects a PR number a sole argument, and issues the DELETE command.  Returns 
+true if PR is successfully deleted, false otherwise.  
 
 =head2 checkPR()
 
+Expects the text representation of a PR (see COMMON TASKS above) as input 
+and issues the CHEK initial command.  Returns true if the given PR is a
+valid entry, false otherwise.
+
 =head2 setWorkingEmail()
+
+Expects an email address as sole argument, and issues the EDITADDR command.  
+Returns true if email successfully set, false otherwise.  
 
 =head2 replaceField()
 
+Expects a PR number, a fieldname, and a replacement value as arguments, and
+issues the REPL command.  Returns true if field successfully replaced, 
+false otherwise.
+
 =head2 appendToField()
+
+Expects a PR number, a fieldname, and a append value as arguments, and
+issues the APPN command.  Returns true if field successfully appended to, 
+false otherwise.
 
 =head2 submitPR()
 
+Expect a Gnats::PR object as sole argument, and issues the SUMB command.  
+Returns true if PR successfully submitted, false otherwise.
+
 =head2 getPRByNumber()
 
-=head2 expr()
+Expects a number as sole argument.  Returns a Gnats::PR object.
 
 =head2 query()
 
-=head2 admv()
+Expects one or more query expressions as argument(s).  Returns a list of
+PR numbers.
 
 =head2 login()
  
+Expects a database name, user name, and password as arguments and issues the 
+CHDB command.  Returns true if successfully logged in, false otherwise
 
 
+=head1 BUGS
 
-
-
+Bug reports are very welcome.  Please submit to the project page 
+(noted below).
 
 
 =head1 AUTHOR
 
-Mike Hoolehan, mike@sycamore.us
+Mike Hoolehan, <lt>mike@sycamore.us<gt>
+Project hosted at sourceforge, at http://gnatsperl.sourceforge.net
 
-=head1 SEE ALSO
 
-perl(1).
+
+=head1 COPYRIGHT
+
+Copyright (c) 1997-2001, Mike Hoolehan. All Rights Reserved.
+This module is free software. It may be used, redistributed,
+and/or modified under the same terms as Perl itself.
+
 
 =cut

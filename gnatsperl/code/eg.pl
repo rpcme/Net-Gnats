@@ -79,8 +79,6 @@ sub main{
     #print $PRtwo->asString();
     
 
-
-
     print "Disconnecting\n";
     $g->disconnect();
 }
