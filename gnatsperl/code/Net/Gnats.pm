@@ -610,7 +610,6 @@ sub _isCodeOK {
 
 1;
 __END__
-# Below is stub documentation for your module. You better edit it!
 
 =head1 NAME
 
@@ -631,7 +630,7 @@ Net::Gnats - Perl interface to GNU Gnats daemon
   $g->disconnect();
 
 
-=head1 DESCRIPTION
+=head1 ABSTRACT
 
 Net::Gnats provides a perl interface to the gnatsd command set.  Although 
 most of the gnatsd command are present and can be explicitly called through
@@ -639,9 +638,100 @@ Net::Gnats, common gnats tasks can be accompished through some methods
 which simplify the process (especially querying the database, editing bugs,
 etc). 
 
-=head2 EXPORT
+The current version of Net::Gnats (as well as related information) is 
+available at http://gnatsperl.sourceforge.net/
 
-None by default.
+=head1 COMMON TASKS
+
+
+=head2 VIEWING DATABASES
+
+Fetching database names is the only action that can be done on a Gnats 
+object before logging in via the login() method.  
+
+  my $g = Net::Gnats->new();
+  $g->connect();
+  my @dbNames = $g->getDBNames();
+
+Note that getDBNames() is different than listDatabases(), which requires 
+logging in first and gets a little more info than just names.
+
+ 
+=head2 LOGGING IN TO A DATABASE
+
+The Gnats object has to be logged into a database to perform almost all
+actions.  
+
+  my $g = Net::Gnats->new();
+  $g->connect();
+  $g->login("default","myusername","mypassword");
+
+
+=head2 SUBMITTING A NEW PR
+
+The Net::Gnats::PR object acts as a container object to store information
+about a PR (new or otherwise).  A new PR is submitted to gnatsperl by 
+constructing a PR object.
+
+  my $newPR = Net::Gnats::PR->new();
+  $newPR->setField("Submitter-Id","developer");
+  $newPR->setField("Originator","Doctor Wifflechumps");
+  $newPR->setField("Organization","GNU");
+  $newPR->setField("Synopsis","Some bug from perlgnats");
+  $newPR->setField("Confidential","no");
+  $newPR->setField("Severity","serious");
+  $newPR->setField("Priority","low");
+  $newPR->setField("Category","gnatsperl");
+  $newPR->setField("Class","sw-bug");
+  $newPR->setField("Description","Something terrible happened");
+  $newPR->setField("How-To-Repeat","Like this.  Like this.");
+  $newPR->setField("Fix","Who knows");
+  $g->submitPR($newPR);
+
+Obviously, fields are dependent on a specific gnats installation, since 
+Gnats administrators can rename fields and add constraints.  There are some
+methods in Net::Gnats to discover field names and constraints, all described
+below. 
+
+Instead of setting each field of the PR individually, the setFromString()
+method is available.  The string that is passed to it must be formatted
+in the way Gnats handles the PRs.  This is useful when handling a Gnats
+email submission ($newPR->setFromString($email)) or when reading a PR file
+directly from the database.  See Net::Gnats::PR for more details.
+
+
+=head2 QUERYING THE PR DATABASE
+
+  my @prNums = $g->query('Number>"12"', "Category=\"$thisCat\"");
+  print "Found ". join(":",@prNums)." matching PRs \n";
+
+Pass a list (one is ok) of query expressions to query().  A list of PR 
+numbers of matching PRs is returned.  You can then pull out each PR as 
+described next.
+
+
+=head2 FETCHING A PR
+
+  my $prnum = 23;  
+  my $PR = $g->getPRByNumber($prnum);
+  print $PR->getField('synopsis');
+  print $PR->asString();
+
+The method getPRByNumber() will return a Net::Gnats::PR object corresponding
+to the PR num that was passed to it.  The getField() and asString() methods
+are documented in Net::Gnats::PR, but I will note here that asString() 
+returns a string in the proper Gnats format, and can therefore be submitted 
+directly to Gnats via email or saved to the db directory for instance.  Also,
+$newPR->setFromString( $oldPR->asString() ) works fine and will result in 
+a duplicate of the original PR object.
+
+
+
+=head1 METHOD DESCRIPTIONS
+
+
+
+
 
 
 =head1 AUTHOR
