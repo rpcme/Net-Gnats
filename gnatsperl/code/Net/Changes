@@ -1,0 +1,6 @@
+Revision history for Perl extension Net::Gnats.
+
+0.01  Sun Aug 25 20:09:22 2002
+	- original version; created by h2xs 1.20 with options
+		-X -n Net::Gnats
+
