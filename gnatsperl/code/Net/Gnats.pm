@@ -29,6 +29,7 @@ our $VERSION = '0.01';
 
 
 use strict;
+use Carp;
 use Socket;
 use IO::Handle;
 
@@ -74,7 +75,7 @@ sub connect {
     #TODO disconnect if already connected
 
     if (!($iaddr = inet_aton($self->{hostAddr}))) {
-        print("Unknown GNATS host '$self->{hostAddr}'");
+        carp("Unknown GNATS host '$self->{hostAddr}'");
         return 0;
     }
     $paddr = sockaddr_in($self->{hostPort}, $iaddr);
@@ -650,7 +651,7 @@ sub _extractResponseCode {
     if ($response =~ /^(\d\d\d)( |-)/s) {
         $code = $1;
     } else {
-        print "COULDN'T PARSE SERVER RESPONSE\n";
+        warn "Could not parse gnatsd response\n";
         return undef; #FIXME a little better here    
     }
   
