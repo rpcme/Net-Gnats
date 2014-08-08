@@ -3,7 +3,6 @@ package Net::Gnats;
 require 5.005_62;
 use strict;
 use warnings;
-#use Data::Dumper;
 
 require Exporter;
 require Net::Gnats::PR;
@@ -48,8 +47,7 @@ my $maxNewPRs = 100;
 # Args: hash (parameter list) 
 # Returns: self
 #******************************************************************************
-sub new 
-{
+sub new {
     my $proto = shift;
     my $class = ref($proto) || $proto;
     my $self = {};
@@ -82,7 +80,6 @@ sub new
     $self->{db}   = undef;
 
     return $self;
-
 }
 
 sub connect {
@@ -130,29 +127,22 @@ sub connect {
     return 1;
 }
 
-
-
-
 sub disconnect {
     my $self = shift;
     $self->_doGnatsCmd("QUIT");
-    #$self->{connection}->print("QUIT");
-    #$self->{connection} = undef;
 }
-    
-sub getDBNames {
-    my $self = shift;
-    my $code;
-    my $response;
 
-    ($code, $response) = $self->_doGnatsCmd("DBLS");
+sub getDBNames {
+    my ( $self ) = @_;
+
+    my ($code, $response) = $self->_doGnatsCmd("DBLS");
+
     if ($self->_isCodeOK($code)) {
         return $self->_extractListContent($response);
-    } else {
-        $self->_markError($code, $response);
-        return undef;
     }
-    
+
+    $self->_markError($code, $response);
+    return undef;
 }
 
 
@@ -696,7 +686,6 @@ sub filloutPR {
   }
 }
 
-
 sub getPRByNumber {
     my $self = shift;
     my $num = shift;
@@ -706,7 +695,7 @@ sub getPRByNumber {
         $self->_markError($code, $response);
         return undef;
     }
-    
+
     ($code, $response) = $self->_doGnatsCmd("QFMT full");
     if (not $self->_isCodeOK($code)) {
         $self->_markError($code, $response);
@@ -817,7 +806,7 @@ sub _convertGnatsRecordToHashRef {
     }
     return $hash;
 }
-    
+
 
 sub login {
     my $self = shift;
@@ -964,7 +953,7 @@ sub _extractResponseCode {
         $code = $1;
     } else {
         warn "Could not parse gnatsd response \"$response\"";
-        return undef; #FIXME a little better here    
+        return undef; #FIXME a little better here
     }
   
     return $code;
@@ -980,9 +969,10 @@ sub _extractListContent {
 }
 
 sub _escapeMultiText {
-  my $self = shift;
-  my $text = shift;
+  my ( $self, $text ) = @_;
+
   $text =~ s/^[.]/../gm;
+
   # If there is any text, make sure it ends with a newline.
   if ($text ne "") {
     chomp($text);
@@ -991,34 +981,24 @@ sub _escapeMultiText {
   return $text;
 }
 
-
-
-
-
 sub _isCodeOK {
-    my $self = shift;
-    my $code = shift;
-  if (defined($code)) {
-    if (($code =~ /2\d\d/) or ($code =~ /3\d\d/)) {
-        return 1;
-    } else {
-        return 0;
-    }
-  }
+  my ( $self, $code ) = @_;
+
+  return 0 if not defined $code;
+  return 1 if $code =~ /[23]\d\d/;
+  return 0;
 }
 
-
 sub _clearError {
-    my $self = shift;
+    my ( $self ) = @_;
     $self->{errorCode} = undef;
     $self->{errorMessage} = undef;
 }
 
 
 sub _markError {
-    my $self = shift;
-    my $code = shift;
-    my $msg = shift;
+    my ($self, $code, $msg) = @_;
+
     $self->{errorCode} = $code;
     $self->{errorMessage} = $msg;
 }
