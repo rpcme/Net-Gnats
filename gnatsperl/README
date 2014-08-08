@@ -15,6 +15,22 @@ unarchived this distribution and type the following:
     make test
     make install
 
+DEVELOPMENT
+
+Devel::Cover and Perl::Cover is required for this development
+environment.
+
+After modifying code, run:
+
+    $ cover -test
+
+And review coverage results (or lack thereof).
+
+Further, make sure your code adheres to common Perl standards.
+
+    $ perlcritic --brutal lib/
+
+At the time of writing, there are 469 outstanding critic issues.
 
 HOMEPAGE
 http://gnatsperl.sourceforge.net/ 
