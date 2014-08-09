@@ -41,7 +41,7 @@ our $REVISION = '$Id$'; #'
 # Returns: self
 #******************************************************************************
 sub new 
-{   
+{
     my $proto = shift;
     my $class = ref($proto) || $proto;
     my $self = {};
