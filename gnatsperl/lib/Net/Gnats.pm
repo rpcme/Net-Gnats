@@ -3,6 +3,7 @@ use utf8;
 use strict;
 use warnings;
 use Readonly;
+use English '-no_match_vars';
 
 require Exporter;
 use AutoLoader qw(AUTOLOAD);
@@ -43,13 +44,14 @@ BEGIN {
 
   *checkNewPR = \&check_newpr;
 
-  *lockPR = \&lock_pr;
+  *lockPR   = \&lock_pr;
   *unlockPR = \&unlock_pr;
   *deletePR = \&delete_pr;
-  *checkPR = \&check_pr;
-  *submitPR =\&submit_pr;
+  *checkPR  = \&check_pr;
+  *submitPR = \&submit_pr;
+  *updatePR = \&update_pr;
 
-
+  *resetServer = \&reset_server;
 }
 
 # Items to export into callers namespace by default. Note: do not export
@@ -120,33 +122,33 @@ sub gnatsd_connect {
     $paddr = sockaddr_in($self->{hostPort}, $iaddr);
     $proto = getprotobyname 'tcp' ;
     if ( not socket SOCK, PF_INET, SOCK_STREAM, $proto ) {
-         carp "gnatsweb: client_init error $self->{hostAddr} $self->{hostPort}: $!";
+      #TODO: RECOVER BETTER HERE
+         carp "gnatsweb: client_init error $self->{hostAddr} $self->{hostPort}: $OS_ERROR";
         return 0;
     }
 
     if ( not connect SOCK, $paddr ) {
-         carp "gnatsweb: client_init error $self->{hostAddr} $self->{hostPort}: $! ;";
+      #TODO: RECOVER BETTER HERE
+         carp "gnatsweb: client_init error $self->{hostAddr} $self->{hostPort}: $OS_ERROR ;";
         return 0;
     }
 
     SOCK->autoflush(1);
     my $response = $self->_get_gnatsd_response();
-    _debug('DEBUG: INIT: [' . $response . ']');
-    my $code     = $self->_extract_response_code($response);
-    $self->{lastCode} = $code;
-    $self->{lastResponse} = $response;
+    $self->{lastCode} = $response->code;
+    $self->{lastResponse} = $response->raw;
+    _debug('INIT: [' . $response->raw . ']');
 
     # Make sure we got a 200 code.
-    if ($code != 200) {
+    if ($response->code != 200) {
       warn "? Error: Unknown gnatsd connection response: $response";
       return 0;
     }
-    $response =~ s/\r|\n//g;
+
     # Grab the gnatsd version
-    _debug($response);
-    if ( $response =~ /\d.\d.\d/ ) {
-      $self->{gnatsdVersion} = $response;
-      $self->{gnatsdVersion} =~ s/.*(\d.\d.\d).*/$1/m;
+    if ( $response->raw =~ /\d.\d.\d/sxm ) {
+      $self->{gnatsdVersion} = $response->raw;
+      $self->{gnatsdVersion} =~ s/.*(\d.\d.\d).*/$1/sxm;
     }
     else {
       # We only know how to talk to gnats4
@@ -166,11 +168,13 @@ sub get_dbnames {
     my ( $self ) = @_;
 
     my ($code, $response) = $self->_do_gnats_cmd('DBLS');
+    _debug('DBLS CODE: [' . $code . ']');
 
     if ($self->_is_code_ok($code)) {
         return $self->_extract_list_content($response);
     }
 
+    _debug('DBLS DID NOT PASS IS_CODE_OK');
     $self->_mark_error($code, $response);
     return;
 }
@@ -224,7 +228,7 @@ sub list_inputfields_initial {
     if ($self->_is_code_ok($code)) {
       push @{$self->{fieldData}->{initial}}, $self->_extract_list_content($response);
     } else {
-      $self->_marke_error($code, $response);
+      $self->_mark_error($code, $response);
       return;
     }
   }
@@ -234,20 +238,25 @@ sub list_inputfields_initial {
 sub get_field_type {
   my ( $self, $field ) = @_;
 
-  if ( defined $self->{fieldData}->{fields}->{$field}->{type} ) {
-    return $self->{fieldData}->{fields}->{$field}->{type};
-  }
+  if (not defined $field) { return; }
+
+
+
+#  if ( defined $self->{fieldData}->{fields}->{$field}->{type} ) {
+#    return $self->{fieldData}->{fields}->{$field}->{type};
+#  }
 
   my ($code, $response) = $self->_do_gnats_cmd("FTYP $field");
+  if ( $code == 410 ) { return undef; }
 
-  if ( ! $self->_is_code_ok($code) ) {
-    $self->_mark_error($code, $response);
-    return;
-  }
+#  if ( ! $self->_is_code_ok($code) ) {
+#    $self->_mark_error($code, $response);
+#    return;
+#  }
 
-  $response =~ s/^\d+\s+//sxm;
-  chomp $response;
-  $self->{fieldData}->{fields}->{$field}->{type} = $response;
+#  $response =~ s/^\d+\s+//sxm;
+#  chomp $response;
+#  $self->{fieldData}->{fields}->{$field}->{type} = $response;
 
   return $response;
 }
@@ -262,17 +271,26 @@ sub is_validfield {
 
 sub get_field_typeinfo {
   my ( $self, $field, $property ) = @_;
+  if ( not defined $field ) { return; }
+  my $type_response = $self->get_field_type($field);
+  _debug('FTYP (response): [' . $type_response . ']');
+  if ( $type_response ne 'MultiEnum' ) { return; }
+  if ( not defined $property ) { $property = 'separators'; }
 
-  if (not exists($self->{fieldData}->{fields}->{$field}->{typeInfo})) {
-    my ($code, $response) = $self->_do_gnats_cmd("FTYPINFO $field $property");
-    if ($self->_is_code_ok($code)) {
-      $self->{fieldData}->{fields}->{$field}->{typeInfo} = $response;
-    } else {
-      $self->_mark_error($code, $response);
-      return;
-    }
-  }
-  return $self->{fieldData}->{fields}->{$field}->{typeInfo};
+
+  my ($code, $response) = $self->_do_gnats_cmd("FTYPINFO $field $property");
+  if ( $code == 435 ) { return undef; }
+
+  # if (not exists($self->{fieldData}->{fields}->{$field}->{typeInfo})) {
+  #   if ($self->_is_code_ok($code)) {
+  #     $self->{fieldData}->{fields}->{$field}->{typeInfo} = $response;
+  #   } else {
+  #     $self->_mark_error($code, $response);
+  #     return;
+  #   }
+  # }
+  # return $self->{fieldData}->{fields}->{$field}->{typeInfo};
+  return $response;
 }
 
 
@@ -289,25 +307,14 @@ sub get_field_desc {
 }
 
 sub get_field_flags {
-    my ( $self, $field, $flag ) = @_;
+  my ( $self, $field, $flag ) = @_;
+  if ( not defined $field ) { return; }
 
-    if (not exists($self->{fieldData}->{fields}->{$field}->{flags})) {
-      my ($code, $response) = $self->_do_gnats_cmd("FIELDFLAGS $field");
-      if ($self->_is_code_ok($code)) {
-        $self->{fieldData}->{fields}->{$field}->{flags} = $response;
-      } else {
-        $self->_mark_error($code, $response);
-        return;
-      }
-    }
-    if ($flag) {
-      foreach my $f ( split ' ', $self->{fieldData}->{fields}->{$field}->{flags} ) {
-        return 1 if lc $f eq lc $flag;
-      }
-      return 0;
-    } else {
-      return $self->{fieldData}->{fields}->{$field}->{flags};
-    }
+  my ($code, $response) = $self->_do_gnats_cmd("FIELDFLAGS $field");
+
+  if (defined $flag and $response =~ /$flag/) { return 1; }
+
+  return $response;
 }
 
 sub get_field_validators {
@@ -361,7 +368,7 @@ sub get_field_default {
 }
 
 
-sub resetServer {
+sub reset_server {
   my ( $self ) = @_;
 
   my ($code, $response) = $self->_do_gnats_cmd('RSET');
@@ -615,7 +622,7 @@ sub submit_pr {
 #
 # Bit's of this code were grabbed from "gnatsweb.pl".
 #
-sub updatePR {
+sub update_pr {
   my ( $self, $pr ) = @_;
 
   my $user         = $self->{user};
@@ -833,7 +840,7 @@ sub _do_gnats_cmd {
 
   $self->_clear_error();
 
-  _debug('DEBUG: SENDING: [' . $cmd . ']');
+  _debug('SENDING: [' . $cmd . ']');
 
   print SOCK "$cmd\n";
 
@@ -844,8 +851,8 @@ sub _do_gnats_cmd {
 
 sub _process {
   my ( $self ) = @_;
-  my $r = Net::Gnats::Response->new({raw => $self->_get_gnatsd_response()});
-  $r->code($self->_extract_response_code($r->raw));
+
+  my $r = $self->_get_gnatsd_response;
 
   if ($r->raw =~ /^411 There is a bad value/sxm) {
     <SOCK>
@@ -862,15 +869,14 @@ sub _get_gnatsd_response {
     my @lines;
     my $is_ml = 0; # multiline response
 
-    while (1) {
-        _debug('DEBUG: Reading...');
-        my $line = <SOCK>;
+    my $r = Net::Gnats::Response->new;
 
+    while (1) {
+        my $line = <SOCK>;
         if (not defined $line) { last; }
 
-        $line =~ s/\r|\n//g;
-        _debug('DEBUG: READ: [' . __LINE__ . '][' . $line . ']');
-
+        $line =~ s/\r|\n//gsxm;
+        _debug('READ: [' . __LINE__ . '][' . $line . ']');
 
         if ( $is_ml and $line =~ /^\.$/sxm ) {
           last;
@@ -878,14 +884,27 @@ sub _get_gnatsd_response {
 
         my $code = $self->_extract_response_code($line);
         if ( defined $code ) {
-          _debug('DEBUG: CODE: [' . $code . ']');
+          _debug('CODE: [' . $code . ']');
+          $r->code($code);
 
-          if ($code >= 300 and $code <= 350) {
+          if ($code >= 300 and $code <= 349) {
             $is_ml = 1;
+            if ( $line =~ /\d\d\d\sList follows/ ) {
+              next;
+            }
+          }
+          elsif ($code >= 350 and $code <= 399) {
+            if ($line =~ /$code-/) {
+              $is_ml = 1;
+              next;
+            }
+            else {
+              $line =~ s/^\d\d\d\s//sxm;
+              push @lines, $line;
+              last;
+            }
           }
         }
-
-        _debug("DEBUG: isMultiLineResponse=$is_ml");
 
         # Lines which begin with a '.' are escaped by gnatsd with another '.'
         $line =~ s/^\.\././sxm;
@@ -901,7 +920,9 @@ sub _get_gnatsd_response {
 
     my $response = join "\n", @lines;
 
-    return $response;
+    $r->raw($response);
+
+    return $r;
 }
 
 
@@ -920,11 +941,7 @@ sub _extract_response_code {
 
 sub _extract_list_content {
   my ( $self, $response ) = @_;
-
-  $response =~ s/\r//gsxm;
   my @lines = split /\n/sxm, $response;
-  shift @lines; # first item is the response message
-
   return @lines;
 }
 
@@ -951,6 +968,7 @@ sub _mark_error {
 
   $self->{errorCode} = $code;
   $self->{errorMessage} = $msg;
+  _debug('ERROR: CODE: [' . $code . '] MSG: [' . $msg . ']');
 
   return;
 }
@@ -978,11 +996,6 @@ Net::Gnats - Perl interface to GNU Gnats daemon
 
 0.7
 
-=head1 INCOMPATIBILITIES
-
-This library is not compatible with the Gnats protocol prior to GNATS
-4.
-
 =head1 SYNOPSIS
 
   use Net::Gnats;
@@ -993,8 +1006,10 @@ This library is not compatible with the Gnats protocol prior to GNATS
 
   my $PRtwo = $g->getPRByNumber(2);
   print $PRtwo->asString();
+
   # Change the synopsis
   $PRtwo->replaceField("Synopsis","The New Synopsis String");
+
   # Change the responsible, which requires a change reason.
   $PRtwo->replaceField("Responsible","joe","Because It's Joe's");
 
@@ -1152,101 +1167,101 @@ the getErrorCode() and getErrorMessage() methods.
 
 =head1 SUBROUTINES/METHODS
 
-=head2 new()
+=head2 new
 
 Constructor, optionally taking one or two arguments of hostname and
 port of the target gnats server.  If not supplied, the hostname
 defaults to localhost and the port to 1529.
 
-=head2 gnatsd_connect()
+=head2 gnatsd_connect
 
 Connects to the gnats server.  No arguments.  Returns true if
 successfully connected, false otherwise.
 
 
-=head2 disconnect()
+=head2 disconnect
 
 Issues the QUIT command to the Gnats server, therby closing the
 connection.
 
-=head2 getDBNames()
+=head2 get_dbnames
 
 Issues the DBLS command, and returns a list of database names in the
 gnats server.  Unlike listDatabases, one does not need to use the logn
 method before using this method.
 
-=head2 listDatabases()
+=head2 list_databases
 
 Issues the LIST DATABASES command, and returns a list of hashrefs with
 keys 'name', 'desc', and 'path'.
 
-=head2 listCategories()
+=head2 list_categories
 
 Issues the LIST CATEGORIES command, and returns a list of hashrefs
 with keys 'name', 'desc', 'contact', and '?'.
 
-=head2 listSubmitters()
+=head2 list_submitters
 
 Issues the LIST SUBMITTERS command, and returns a list of hashrefs
 with keys 'name', 'desc', 'contract', '?', and 'responsible'.
 
-=head2 listRepsonsible()
+=head2 list_responsible
 
 Issues the LIST RESPONSIBLE command, and returns a list of hashrefs
 with keys 'name', 'realname', and 'email'.
 
-=head2 listStates()
+=head2 list_states()
 
 Issues the LIST STATES command, and returns a list of hashrefs with
 keys 'name', 'type', and 'desc'.
 
-=head2 listFieldNames()
+=head2 list_field_names()
 
 Issues the LIST FIELDNAMES command, and returns a list of hashrefs
 with key 'name'.
 
-=head2 listInitialInputFields()
+=head2 list_inputfields_initial
 
 Issues the LIST INITIALINPUTFIELDS command, and returns a list of
 hashrefs with key 'name'.
 
-=head2 getFieldType()
+=head2 get_field_type
 
 Expects a fieldname as sole argument, and issues the FTYP command.
 Returns text response or undef if error.
 
-=head2 getFieldTypeInfo()
+=head2 get_field_type_info
 
 Expects a fieldname and property as arguments, and issues the FTYPINFO
 command.  Returns text response or undef if error.
 
-=head2 getFieldDesc()
+=head2 get_field_desc
 
 Expects a fieldname as sole argument, and issues the FDSC command.
 Returns text response or undef if error.
 
-=head2 getFieldFlags()
+=head2 get_field_flags
 
 Expects a fieldname as sole argument, and issues the FIELDFLAGS
 command.  Returns text response or undef if error.
 
-=head2 getFieldValidators()
+=head2 get_field_validators
 
 Expects a fieldname as sole argument, and issues the FVLD command.
 Returns text response or undef if error.
 
-=head2 validateField()
+=head2 validate_field()
 
 Expects a fieldname and a proposed value for that field as argument,
 and issues the VFLD command.  Returns true if propose value is
 acceptable, false otherwise.
 
-=head2 getFieldDefault()
+=head2 get_field_default
 
 Expects a fieldname as sole argument, and issues the INPUTDEFAULT
 command.  Returns text response or undef if error.
 
-=head2 resetServer()
+=head2 reset_server
 
 Issues the RSET command, returns true if successful, false otherwise.
 
@@ -1302,17 +1317,17 @@ Expects a PR number, a fieldname, and a append value as arguments, and
 issues the APPN command.  Returns true if field successfully appended
 to, false otherwise.
 
-=head2 submitPR()
+=head2 submit_pr
 
 Expect a Gnats::PR object as sole argument, and issues the SUMB
 command.  Returns true if PR successfully submitted, false otherwise.
 
-=head2 updatePR()
+=head2 update_pr
 
 Expect a Gnats::PR object as sole argument, and issues the EDIT
 command.  Returns true if PR successfully submitted, false otherwise.
 
-Use this instead of replaceField if more than one field has changed.
+Use this instead of replace_field if more than one field has changed.
 
 =head2 getPRByNumber()
 
@@ -1334,6 +1349,11 @@ false otherwise
 Returns the current access mode of the gnats database.  Either "edit",
 "view", or undef;
 
+=head1 INCOMPATIBILITIES
+
+This library is not compatible with the Gnats protocol prior to GNATS
+4.
+
 =head1 BUGS AND LIMITATIONS
 
 Bug reports are very welcome.  Please submit to the project page
@@ -1349,8 +1369,13 @@ No runtime dependencies other than the Perl core at this time.
 
 =head1 AUTHOR
 
+Current Maintainer:
+Richard Elberger riche@cpan.org
+
+Original Author:
 Mike Hoolehan, <lt>mike@sycamore.us<gt>
-Changes by:
+
+Contributions By:
 Jim Searle, <lt>jims2@cox.net<gt>
 Project hosted at sourceforge, at http://gnatsperl.sourceforge.net
 

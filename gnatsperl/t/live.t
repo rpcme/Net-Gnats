@@ -7,7 +7,7 @@ unless ( $ENV{'GNATS_MAINTAINER'} ) {
   plan skip_all => "Live tests by default are skipped, maintainer only.";
 }
 else {
-  plan tests => 10;
+  plan tests => 18;
 }
 
 use Net::Gnats;
@@ -39,7 +39,20 @@ ok($g->list_categories, 'list_categories');
 ok($g->list_submitters, 'list_submitters');
 ok($g->list_responsible, 'list_responsible');
 ok($g->list_states, 'list_states');
+ok($g->list_fieldnames, 'list_fieldnames');
+ok($g->list_inputfields_initial, 'list_inputfields_initial');
 
+is($g->get_field_typeinfo('Originator'), undef, 'get_field_typeinfo - bad arg');
+# Note typeinfo req MultiEnum so if the field's not MultiEnum, you get undef
+is($g->get_field_typeinfo('Originator', 'separators'), undef, 'get_field_typeinfo');
+# TODO : Find MultiEnum field to test this
+#ok($g->get_field_typeinfo('State', 'separators'), 'get_field_typeinfo');
+
+ok(defined $g->get_field_desc('Originator'), 'get_field_desc');
+ok(defined $g->get_field_flags('Originator'), 'get_field_flags');
+
+is($g->get_field_type, undef, 'get_field_type - bad arg');
+ok(defined $g->get_field_type('Responsible'), 'get_field_type');
 ok($g->disconnect, 'Logout of gnats');
 
 done_testing();
