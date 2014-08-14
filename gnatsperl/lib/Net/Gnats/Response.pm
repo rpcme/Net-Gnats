@@ -60,6 +60,11 @@ sub as_list {
   return \@lines;
 }
 
+sub as_string {
+  my ( $self ) = @_;
+  return join "\n", @{ $self->raw };
+}
+
 1;
 
 =encoding utf8

@@ -1,18 +1,18 @@
 package Net::Gnats::PR;
-
-require 5.005_62;
+use utf8;
 use strict;
 use warnings;
 use Carp;
-
+$| = 1;
 require Exporter;
 use AutoLoader qw(AUTOLOAD);
-#use Data::Dumper;
 
 our @ISA = qw(Exporter);
 
-# Items to export into callers namespace by default. Note: do not export
-# names by default without a very good reason. Use EXPORT_OK instead.
+# Items to export into callers namespace by default. Note: do not
+# export names by default without a very good reason. Use EXPORT_OK
+# instead.
+
 # Do not simply export all your public functions/methods/constants.
 
 # This allows declaration	use Net::Gnats ':all';
@@ -40,17 +40,14 @@ our $REVISION = '$Id$'; #'
 # Args: hash (parameter list) 
 # Returns: self
 #******************************************************************************
-sub new 
-{
-    my $proto = shift;
-    my $class = ref($proto) || $proto;
-    my $self = {};
-    bless($self, $class);
+sub new {
+    my ( $class, $gnatsobj ) = @_;
+    my $self = bless {}, $class;
 
-    $self->{__gnatsObj} = shift;
+    $self->{__gnatsObj} = $gnatsobj;
     $self->{number} = undef;
     $self->{fields} = undef;
-    confess "? Error: Must pass Net::Gnats object as first argument to $proto"
+    confess '? Error: Must pass Net::Gnats object as first argument'
       if (not defined $self->{__gnatsObj});
     return $self;
 }
@@ -69,10 +66,12 @@ sub getField {
     my $field = shift;
     return $self->{fields}->{$field};
 }
+
 # This is legacy...
 sub getNumber {
   return $_[0]->getField("Number");
 }
+
 sub getKeys {
     my $self = shift;
     return keys(%{$self->{fields}});
@@ -92,10 +91,9 @@ sub asString {
 
 # Split comma-separated list.
 # Commas in quotes are not separators!
-sub split_csl
-{
+sub split_csl {
   my ($list) = @_;
-  
+
   # Substitute commas in quotes with \002.
   while ($list =~ m~"([^"]*)"~g)
   {
@@ -139,9 +137,8 @@ sub fix_email_addrs
   $addrs;
 }
 
-sub parse
-{
-  my $self = shift;
+sub parse {
+  my $self  = shift;
   # 9/18/99 kenstir: This two-liner can almost replace the next 30 or so
   # lines of code, but not quite.  It strips leading spaces from multiline
   # fields.
@@ -152,52 +149,44 @@ sub parse
 
   my $debug = 0;
 
-  my($hdrmulti) = "envelope";
-  my(%fields);
-  foreach (@_)
-  {
+  my $hdrmulti = 'envelope';
+  my ( %fields );
+  foreach (@_) {
     next if /^300 PRs follow./;
     chomp($_);
     $_ .= "\n";
-    if(!/^([>\w\-]+):\s*(.*)\s*$/)
-    {
-      if($hdrmulti ne "")
-      {
+    if(!/^([>\w\-]+):\s*(.*)\s*$/) {
+      if ($hdrmulti ne '') {
         $fields{$hdrmulti} .= $_;
       }
       next;
     }
-    my ($hdr, $arg, $ghdr) = ($1, $2, "*not valid*");
-    if($hdr =~ /^>(.*)$/)
-    {
+    my ($hdr, $arg, $ghdr) = ($1, $2, "*notvalid*");
+    if ($hdr =~ /^>(.*)$/) {
       $ghdr = $1;
     }
 
     my $cleanhdr = $ghdr;
     $cleanhdr =~ s/^>([^:]*).*$/$1/;
 
-    if($self->{__gnatsObj}->isValidField($cleanhdr))
-    {
-      if($self->{__gnatsObj}->getFieldType($cleanhdr) eq 'MultiText')
-      {
+    if ($self->{__gnatsObj}->isValidField($cleanhdr)) {
+      if ($self->{__gnatsObj}->getFieldType($cleanhdr) eq 'MultiText') {
         $hdrmulti = $ghdr;
         $fields{$ghdr} = "";
       }
-      else
-      {
-        $hdrmulti = "";
+      else {
+        $hdrmulti = '';
         $fields{$ghdr} = $arg;
       }
     }
-    elsif($hdrmulti ne "")
-    {
-      $fields{$hdrmulti} .= $_;
+    elsif ($hdrmulti ne '') {
+      $fields{ $hdrmulti } .= $_;
     }
 
     # Grab a few fields out of the envelope as it flies by
     # 8/25/99 ehl: Grab these fields only out of the envelope, not
     # any other multiline field.
-    if($hdrmulti eq "envelope" &&
+    if ( $hdrmulti eq 'envelope' &&
        ($hdr eq "Reply-To" || $hdr eq "From"))
     {
       $arg = fix_email_addrs($arg); # TODO: Should we really do this?
@@ -235,7 +224,6 @@ sub parse
     }
   }
 
-  #return %fields;
   foreach my $field (keys %fields) {
     $fields{$field} =~ s/\r// if defined($fields{$field});
     $self->setField($field,$fields{$field})
@@ -269,13 +257,10 @@ sub can_do_mime {
 #         'gnatsd'  - PR will be filed using gnatsd; proper '.' escaping done
 #         'send'    - PR will be field using gnatsd, and is an initial PR.
 #         'test'    - we're being called from the regression tests
-sub unparse
-{
-  #my($purpose, %fields) = @_;
-  my $self = shift;
-  my $purpose = shift;
+sub unparse {
+  my ( $self, $purpose ) = @_;
   $purpose ||= 'gnatsd';
-  my($tmp, $text);
+  my ( $tmp, $text );
   my $debug = 0;
 
   # First create or reconstruct the Unformatted field containing the
@@ -307,8 +292,7 @@ X-Send-Pr-Version: Net::Gnats-$Net::Gnats::VERSION ($REVISION)
 ";
   }
 
-  foreach ($self->{__gnatsObj}->listFieldNames())
-  {
+  foreach (@{ $self->{__gnatsObj}->list_fieldnames } ) {
     next if /^.$/;
     next if (not defined($fields{$_})); # Don't send fields that aren't defined.
     # Do include Unformatted field in 'send' operation, even though
@@ -410,19 +394,19 @@ constructing a PR object.
   $newPR->setField("How-To-Repeat","Like this.  Like this.");
   $newPR->setField("Fix","Who knows");
 
-Obviously, fields are dependent on a specific gnats installation, since 
-Gnats administrators can rename fields and add constraints.  
+Obviously, fields are dependent on a specific gnats installation,
+since Gnats administrators can rename fields and add constraints.
 
 
 =head2 CREATING A NEW PR OBJECT FROM A PREFORMATTED PR STRING 
 
-Instead of setting each field of the PR individually, the setFromString()
-method is available.  The string that is passed to it must be formatted
-in the way Gnats handles the PRs (i.e. the '>Field: Value' format.  You can
-see this more clearly by looking at the PR files of your Gnats installation).
-This is useful when handling a Gnats email submission 
-($newPR->setFromString($email)) or when reading a PR file directly from the 
-database.  
+Instead of setting each field of the PR individually, the
+setFromString() method is available.  The string that is passed to it
+must be formatted in the way Gnats handles the PRs (i.e. the '>Field:
+Value' format.  You can see this more clearly by looking at the PR
+files of your Gnats installation).  This is useful when handling a
+Gnats email submission ($newPR->setFromString($email)) or when reading
+a PR file directly from the database.
 
 
 =head1 METHOD DESCRIPTIONS

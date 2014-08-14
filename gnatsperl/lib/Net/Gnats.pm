@@ -15,7 +15,7 @@ use Net::Gnats::PR;
 use Net::Gnats::Response;
 
 our $VERSION = '0.07';
-
+$| =1 ;
 
 BEGIN {
   # Create aliases to deprecate 'old' style method calls.
@@ -66,7 +66,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
-my $debug_gnatsd = 1;
+my $debug_gnatsd = 0;
 
 # There is a bug in gnatsd that seems to happen after submitting
 # about 125 new PR's in the same session it starts thinking that
@@ -108,6 +108,10 @@ sub new {
     return $self;
 }
 
+sub _debug_gnatsd {
+  $debug_gnatsd = 1;
+}
+
 sub gnatsd_connect {
     my ( $self ) = @_;
     my ( $iaddr, $paddr, $proto );
@@ -136,8 +140,8 @@ sub gnatsd_connect {
     SOCK->autoflush(1);
     my $response = $self->_get_gnatsd_response();
     $self->{lastCode} = $response->code;
-    $self->{lastResponse} = $response->raw;
-    _debug('INIT: [' . $response->raw . ']');
+    $self->{lastResponse} = $response->as_string;
+    _debug('INIT: [' . $response->as_string . ']');
 
     # Make sure we got a 200 code.
     if ($response->code != 200) {
@@ -209,16 +213,9 @@ sub list_states {
 
 sub list_fieldnames {
   my ( $self ) = @_;
-  if ($#{$self->{fieldData}->{names}} < 0) {
-    my ($code, $response) = $self->_do_gnats_cmd('LIST FIELDNAMES');
-    if ($self->_is_code_ok($code)) {
-      push @{$self->{fieldData}->{names}}, $self->_extract_list_content($response);
-    } else {
-      $self->_mark_error($code, $response);
-      return;
-    }
-  }
-  return wantarray ? @{$self->{fieldData}->{names}} : $self->{fieldData}->{names};
+  my ($code, $response) = $self->_do_gnats_cmd('LIST FIELDNAMES');
+  return undef if not $self->_is_code_ok($code);
+  return $response;
 }
 
 sub list_inputfields_initial {
@@ -292,7 +289,6 @@ sub get_field_typeinfo {
   # return $self->{fieldData}->{fields}->{$field}->{typeInfo};
   return $response;
 }
-
 
 sub get_field_desc {
     my ( $self, $field ) = @_;
@@ -537,6 +533,7 @@ sub truncate_field_content {
 }
 
 my $restart_time;
+
 sub restart {
   my ( $self, $code ) = @_;
 
@@ -547,11 +544,13 @@ sub restart {
       return 0;
     }
   }
+
   warn "
 ! ERROR: Recieved GNATSD code $code, will now disconnect and reconnect
          to gnatsd, then re-issue the command.  This may cause any
          following commands to behave differently if you depended on
          things like QFMT\n".time."\n";
+
   $restart_time = $ctime;
   $self->_clear_error();
   $self->disconnect;
@@ -590,27 +589,30 @@ sub append_field_content {
 sub submit_pr {
     my ( $self, $pr ) = @_;
 
-    $self->restart("To Many New PR's") if ($self->{newPRs} > $MAX_NEW_PRS);
+    $self->restart('Too Many New PRs') if ($self->{newPRs} > $MAX_NEW_PRS);
 
     my $prString = $pr->unparse();
 
-    my ($code, $response) = $self->_do_gnats_cmd("SUBM");
+    my ($code, $response) = $self->_do_gnats_cmd('SUBM');
+
     if ($self->_is_code_ok($code)) {
-        ($code, $response) = $self->_do_gnats_cmd($prString."\n".".");
+        ($code, $response) = $self->_do_gnats_cmd($prString. "\n" . '.');
+
         _debug("Gnats::submitPR: code=$code response=$response");
         if ($self->_is_code_ok($code)) {
           $self->{newPRs}++;
-          return 1;
+          return $response;
         } else {
-            $self->_mark_error($code, $response);
+          $self->_mark_error($code, $response);
         }
     } else {
         $self->_mark_error($code, $response);
     }
+
     if ($code eq "640") {
       if ($self->restart($code)) {
-        # TODO: This can potentially be an infinte loop...
-        return $self->submitPR($pr);
+        # TODO: This can potentially be an infinite loop...
+        return $self->submit_pr($pr);
       }
     }
     return 0;
@@ -636,7 +638,7 @@ sub update_pr {
   # Lock the PR so we can edit it.
   # Locking it returns the PR contents which we use to see what has changed.
 
-  my $spr = $self->lockPR($prnum, $user);
+  my $spr = $self->lock_pr($prnum, $user);
 
   return $st if not defined $spr;
 
@@ -665,8 +667,8 @@ sub update_pr {
     }
   }
   # TODO: Detect unlock PR problems?
-  # Seems that unlock sometimes returns a 6xx code even if the lock file is removed? 
-  $self->unlockPR($prnum);
+  # Seems that unlock sometimes returns a 6xx code even if the lock file is removed?
+  $self->unlock_pr($prnum);
   if (not $st) {
     # Something above failed, mark the error.
     $self->_mark_error($code, $response);
@@ -712,7 +714,7 @@ sub getPRByNumber {
     }
 
     my $pr = $self->newPR();
-    $pr->parse(split("\n",$response));
+    $pr->parse( @{ $response } ) ;
 
     return $pr;
 }
@@ -794,7 +796,7 @@ sub login {
         $self->{db}   = $db;
         $self->{user} = $user;
         $self->{pass} = $pass;
-        $self->_setAccessMode; # Set the access mode.
+        $self->_setAccessMode;
         return 1;
     }
 
@@ -807,8 +809,8 @@ sub getAccessMode {
     return $self->{accessMode};
 }
 
-# This is called by login to determine the currrent access mode, typically
-# this would not be called by the user.
+# This is called by login to determine the current access mode,
+# typically this would not be called by the user.
 sub _setAccessMode {
     my ( $self )  = @_;
 
@@ -864,79 +866,86 @@ sub _process {
   return $r;
 }
 
-sub _get_gnatsd_response {
-    my ( $self ) = @_;
-    my @lines;
-    my $is_ml = 0; # multiline response
+# use this routine to get more data from the server such as
+# Lists or PRs.
+sub _read_multi {
+  my ( $self ) = @_;
+  my $raw = [];
+  while ( my $line = <SOCK> ) {
+    if ( $line =~ /^\.\r/) { last; }
+    $line = $self->_read_clean($line);
+    _debug('READ: [' . __LINE__ . '][' . $line . ']');
+    my $parts = $self->_read_decompose( $line );
 
-    my $r = Net::Gnats::Response->new;
-
-    while (1) {
-        my $line = <SOCK>;
-        if (not defined $line) { last; }
-
-        $line =~ s/\r|\n//gsxm;
-        _debug('READ: [' . __LINE__ . '][' . $line . ']');
-
-        if ( $is_ml and $line =~ /^\.$/sxm ) {
-          last;
-        }
-
-        my $code = $self->_extract_response_code($line);
-        if ( defined $code ) {
-          _debug('CODE: [' . $code . ']');
-          $r->code($code);
-
-          if ($code >= 300 and $code <= 349) {
-            $is_ml = 1;
-            if ( $line =~ /\d\d\d\sList follows/ ) {
-              next;
-            }
-          }
-          elsif ($code >= 350 and $code <= 399) {
-            if ($line =~ /$code-/) {
-              $is_ml = 1;
-              next;
-            }
-            else {
-              $line =~ s/^\d\d\d\s//sxm;
-              push @lines, $line;
-              last;
-            }
-          }
-        }
-
-        # Lines which begin with a '.' are escaped by gnatsd with another '.'
-        $line =~ s/^\.\././sxm;
-
-        push @lines, $line; #add current line to the list of response lines
-
-        # a line that ends "\d\d\d " is a last line
-        if ($line =~ /^((\d)\d\d) .*/sxm and not $is_ml) {
-            #if ($1 != 3 or $2 == 350) { #unless it's 3xx, then more data is coming
-            last;
-        }
+    if ( not $self->_read_has_more( $parts ) ) {
+      if ( defined @{ $parts }[0] ) {
+        push @{ $raw }, @{ $parts }[2];
+      }
+      last;
     }
-
-    my $response = join "\n", @lines;
-
-    $r->raw($response);
-
-    return $r;
+    push @{ $raw }, $line;
+  }
+  return $raw;
 }
 
+sub _read {
+  my ( $self ) = @_;
+  my $raw = [];
+  my $response = Net::Gnats::Response->new;
 
+  my $line = <SOCK>;
+  $line = $self->_read_clean($line);
 
+  _debug('READ: [' . __LINE__ . '][' . $line . ']');
 
-sub _extract_response_code {
-  my ($self, $response) = @_;
+  my $result = $self->_read_decompose($line);
 
-  if ($response =~ /^(\d\d\d)/sxm) {
-    return $1;
+  $response->code( @{ $result }[0] );
+
+  if (not defined $response->code) { return undef; }
+
+  unless ( $response->code == 300 or  # do not need 'PRs follow.'
+           $response->code == 301 or  # do not need 'List follows.'
+           $response->code == 351 ) { # do not need ident for single value
+    push @{ $raw }, @{$result}[2];
   }
 
-#  carp "Could not parse gnatsd response \"$response\"";
-  return;
+  if ( $self->_read_has_more( $result ) ) {
+    push @{ $raw } , @{ $self->_read_multi };
+  }
+  $response->raw( $raw );
+  return $response;
+}
+
+sub _read_decompose {
+  my ( $self, $raw ) = @_;
+  my @result = $raw =~ /^(\d\d\d)([- ]?)(.*$)/;
+  return \@result;
+}
+
+sub _read_has_more {
+  my ( $self, $parts ) = @_;
+  if ( @{$parts}[0] ) {
+    if ( @{$parts}[1] eq '-' ) {
+      return 1;
+    }
+    elsif ( @{$parts}[0] >= 300 and @{$parts}[0] < 350) {
+      return 1;
+    }
+    return; # does not pass 'continue' criteria
+  }
+  return 1; # no code, infer multiline read
+}
+
+sub _read_clean {
+  my ( $self, $line ) = @_;
+  $line =~ s/[\r\n]//gsxm;
+  $line =~ s/^\.\././;
+  return $line;
+}
+
+sub _get_gnatsd_response {
+    return shift->_read;
 }
 
 sub _extract_list_content {
@@ -983,6 +992,95 @@ sub _debug {
 # preloaded methods go here.
 
 # Autoload methods go after =cut, and are processed by the autosplit program.
+
+
+Readonly::Scalar my $CODE_GREETING               => 200;
+Readonly::Scalar my $CODE_CLOSING                => 201;
+Readonly::Scalar my $CODE_OK                     => 210;
+Readonly::Scalar my $CODE_SEND_PR                => 211;
+Readonly::Scalar my $CODE_SEND_TEXT              => 212;
+Readonly::Scalar my $CODE_NO_PRS_MATCHED         => 220;
+Readonly::Scalar my $CODE_NO_ADM_ENTRY           => 221;
+Readonly::Scalar my $CODE_PR_READY               => 300;
+Readonly::Scalar my $CODE_TEXT_READY             => 301;
+Readonly::Scalar my $CODE_INFORMATION            => 350;
+Readonly::Scalar my $CODE_INFORMATION_FILLER     => 351;
+Readonly::Scalar my $CODE_NONEXISTENT_PR         => 400;
+Readonly::Scalar my $CODE_EOF_PR                 => 401;
+Readonly::Scalar my $CODE_UNREADABLE_PR          => 402;
+Readonly::Scalar my $CODE_INVALID_PR_CONTENTS    => 403;
+Readonly::Scalar my $CODE_INVALID_FIELD_NAME     => 410;
+Readonly::Scalar my $CODE_INVALID_ENUM           => 411;
+Readonly::Scalar my $CODE_INVALID_DATE           => 412;
+Readonly::Scalar my $CODE_INVALID_FIELD_CONTENTS => 413;
+Readonly::Scalar my $CODE_INVALID_SEARCH_TYPE    => 414;
+Readonly::Scalar my $CODE_INVALID_EXPR           => 415;
+Readonly::Scalar my $CODE_INVALID_LIST           => 416;
+Readonly::Scalar my $CODE_INVALID_DATABASE       => 417;
+Readonly::Scalar my $CODE_INVALID_QUERY_FORMAT   => 418;
+Readonly::Scalar my $CODE_NO_KERBEROS            => 420;
+Readonly::Scalar my $CODE_AUTH_TYPE_UNSUP        => 421;
+Readonly::Scalar my $CODE_NO_ACCESS              => 422;
+Readonly::Scalar my $CODE_LOCKED_PR              => 430;
+Readonly::Scalar my $CODE_GNATS_LOCKED           => 431;
+Readonly::Scalar my $CODE_GNATS_NOT_LOCKED       => 432;
+Readonly::Scalar my $CODE_PR_NOT_LOCKED          => 433;
+Readonly::Scalar my $CODE_CMD_ERROR              => 440;
+Readonly::Scalar my $CODE_WRITE_PR_FAILED        => 450;
+Readonly::Scalar my $CODE_ERROR                  => 600;
+Readonly::Scalar my $CODE_TIMEOUT                => 610;
+Readonly::Scalar my $CODE_NO_GLOBAL_CONFIG       => 620;
+Readonly::Scalar my $CODE_INVALID_GLOBAL_CONFIG  => 621;
+Readonly::Scalar my $CODE_NO_INDEX               => 630;
+Readonly::Scalar my $CODE_FILE_ERROR             => 640;
+
+# bits in fieldinfo(field, flags) has (set=yes not-set=no) whether the
+# send command should include the field
+Readonly::Scalar my $SENDINCLUDE                 => 1;
+
+# whether change to a field requires reason
+Readonly::Scalar my $REASONCHANGE                => 2;
+
+# if set, can't be edited
+Readonly::Scalar my $READONLY                    => 4;
+
+# if set, save changes in Audit-Trail
+Readonly::Scalar my $AUDITINCLUDE                => 8;
+
+# whether the send command _must_ include this field
+Readonly::Scalar my $SENDREQUIRED                => 16;
+
+# The possible values of a server reply type.  $REPLY_CONT means that
+# there are more reply lines that will follow, $REPLY_END Is the final
+# line.
+Readonly::Scalar my $REPLY_CONT                  => 1;
+Readonly::Scalar my $REPLY_END                   => 2;
+
+#
+# Various PR field names that should probably not be referenced in
+# here.
+#
+
+# Actually, the majority of uses are probably OK--but we need to map
+# internal names to external ones.  (All of these field names
+# correspond to internal fields that are likely to be around for a
+# long time.)
+#
+
+Readonly::Scalar my $CATEGORY_FIELD              => 'Category';
+Readonly::Scalar my $SYNOPSIS_FIELD              => 'Synopsis';
+Readonly::Scalar my $SUBMITTER_ID_FIELD          => 'Submitter-Id';
+Readonly::Scalar my $ORIGINATOR_FIELD            => 'Originator';
+Readonly::Scalar my $AUDIT_TRAIL_FIELD           => 'Audit-Trail';
+Readonly::Scalar my $RESPONSIBLE_FIELD           => 'Responsible';
+Readonly::Scalar my $LAST_MODIFIED_FIELD         => 'Last-Modified';
+
+Readonly::Scalar my $NUMBER_FIELD                => 'builtinfield:Number';
+Readonly::Scalar my $STATE_FIELD                 => 'State';
+Readonly::Scalar my $UNFORMATTED_FIELD           => 'Unformatted';
+Readonly::Scalar my $RELEASE_FIELD               => 'Release';
+Readonly::Scalar my $REPLYTO_FIELD               => 'Reply-To';
+
 
 1;
 

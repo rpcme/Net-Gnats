@@ -7,10 +7,11 @@ unless ( $ENV{'GNATS_MAINTAINER'} ) {
   plan skip_all => "Live tests by default are skipped, maintainer only.";
 }
 else {
-  plan tests => 19;
+  plan tests => 21;
 }
 
 use Net::Gnats;
+Net::Gnats::_debug_gnatsd;
 
 my $conn1 = {
              server   => 'localhost',
@@ -26,7 +27,7 @@ my $g = Net::Gnats->new($conn1->{server},
                         $conn1->{port});
 
 is($g->gnatsd_connect, 1, "Connect is OK");
-
+is($g->reset_server, 1, 'Reset is OK');
 is($g->login($conn1->{db},
              $conn1->{username},
              $conn1->{password}), 1, "Login is OK");
@@ -52,19 +53,16 @@ ok(defined $g->get_field_flags('Originator'), 'get_field_flags');
 
 is($g->get_field_type, undef, 'get_field_type - bad arg');
 ok(defined $g->get_field_type('Responsible'), 'get_field_type');
-ok($g->disconnect, 'Logout of gnats');
 
 
 
 # PR Add/Modify/Delete (Basic)
-my $pr = $g->newPR;
-isa_ok($pr, 'Net::Gnats::PR');
-
-  # my $newPR = $g->newPR();
-  # $newPR->setField("Submitter-Id","developer");
-  # $newPR->setField("Originator","Doctor Wifflechumps");
+my $pr1 = $g->newPR;
+isa_ok($pr1, 'Net::Gnats::PR');
+$pr1->setField('Submitter-Id','developer');
+$pr1->setField('Originator', 'Doctor Wifflechumps');
   # $newPR->setField("Organization","GNU");
-  # $newPR->setField("Synopsis","Some bug from perlgnats");
+$pr1->setField('Synopsis','Some bug from perlgnats');
   # $newPR->setField("Confidential","no");
   # $newPR->setField("Severity","serious");
   # $newPR->setField("Priority","low");
@@ -73,7 +71,25 @@ isa_ok($pr, 'Net::Gnats::PR');
   # $newPR->setField("Description","Something terrible happened");
   # $newPR->setField("How-To-Repeat","Like this.  Like this.");
   # $newPR->setField("Fix","Who knows");
-  # $g->submitPR($newPR);
+
+use Data::Dumper;
+
+my $pr1_result = join "\n", @{ $g->submit_pr($pr1) };
+ok($pr1_result > 0, 'we have a pr');
+
+
+my $pr2 = $g->getPRByNumber($pr1_result);
+print Dumper $pr2;
+
+$pr2->setField('Synopsis', 'changing you');
+$g->update_pr($pr2);
+
+$g->check_pr( $pr2->unparse, 'purpose' );
+$g->lockMainDatabase;
+$g->unlockMainDatabase;
+
+ok($g->disconnect, 'Logout of gnats');
+
 
 done_testing();
 
