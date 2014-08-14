@@ -7,7 +7,7 @@ unless ( $ENV{'GNATS_MAINTAINER'} ) {
   plan skip_all => "Live tests by default are skipped, maintainer only.";
 }
 else {
-  plan tests => 18;
+  plan tests => 19;
 }
 
 use Net::Gnats;
