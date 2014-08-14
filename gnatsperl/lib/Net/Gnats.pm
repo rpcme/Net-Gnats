@@ -576,7 +576,7 @@ sub append_field_content {
             return 1;
         } else {
             $self->_mark_error($code, $response);
-        } 
+        }
     } else {
         $self->_mark_error($code, $response);
     }
@@ -999,9 +999,9 @@ Net::Gnats - Perl interface to GNU Gnats daemon
 =head1 SYNOPSIS
 
   use Net::Gnats;
-  my $g = Net::Gnats->new();
-  $g->gnatsd_connect();
-  my @dbNames = $g->getDBNames();
+  my $g = Net::Gnats->new;
+  $g->gnatsd_connect;
+  my @dbNames = $g->get_dbnames;
   $g->login("default","somedeveloper","password");
 
   my $PRtwo = $g->getPRByNumber(2);
@@ -1047,9 +1047,9 @@ available at http://gnatsperl.sourceforge.net/
 Fetching database names is the only action that can be done on a Gnats
 object before logging in via the login() method.
 
-  my $g = Net::Gnats->new();
-  $g->gnatsd_connect();
-  my @dbNames = $g->getDBNames();
+  my $g = Net::Gnats->new;
+  $g->gnatsd_connect;
+  my @dbNames = $g->getDBNames;
 
 Note that getDBNames() is different than listDatabases(), which
 requires logging in first and gets a little more info than just names.
@@ -1059,8 +1059,8 @@ requires logging in first and gets a little more info than just names.
 The Gnats object has to be logged into a database to perform almost
 all actions.
 
-  my $g = Net::Gnats->new();
-  $g->gnatsd_connect();
+  my $g = Net::Gnats->new;
+  $g->gnatsd_connect;
   $g->login("default","myusername","mypassword");
 
 
@@ -1210,12 +1210,12 @@ with keys 'name', 'desc', 'contract', '?', and 'responsible'.
 Issues the LIST RESPONSIBLE command, and returns a list of hashrefs
 with keys 'name', 'realname', and 'email'.
 
-=head2 list_states()
+=head2 list_states
 
 Issues the LIST STATES command, and returns a list of hashrefs with
 keys 'name', 'type', and 'desc'.
 
-=head2 list_field_names()
+=head2 list_fieldnames
 
 Issues the LIST FIELDNAMES command, and returns a list of hashrefs
 with key 'name'.
@@ -1273,12 +1273,12 @@ Issues the LKDB command, returns true if successful, false otherwise.
 
 Issues the UNDB command, returns true if successful, false otherwise.
 
-=head2 lockPR()
+=head2 lock_pr
 
 Expects a PR number and user name as arguments, and issues the LOCK
 command.  Returns true if PR is successfully locked, false otherwise.
 
-=head2 unlockPR()
+=head2 unlock_pr
 
 Expects a PR number a sole argument, and issues the UNLK command.
 Returns true if PR is successfully unlocked, false otherwise.
@@ -1288,18 +1288,18 @@ Returns true if PR is successfully unlocked, false otherwise.
 Expects a PR number a sole argument, and issues the DELETE command.
 Returns true if PR is successfully deleted, false otherwise.
 
-=head2 checkPR()
+=head2 check_pr
 
 Expects the text representation of a PR (see COMMON TASKS above) as
 input and issues the CHEK initial command.  Returns true if the given
 PR is a valid entry, false otherwise.
 
-=head2 setWorkingEmail()
+=head2 set_workingemail
 
 Expects an email address as sole argument, and issues the EDITADDR
 command.  Returns true if email successfully set, false otherwise.
 
-=head2 replaceField()
+=head2 truncate_field_content
 
 Expects a PR number, a fieldname, a replacement value, and optionally
 a changeReason value as arguments, and issues the REPL command.
@@ -1311,7 +1311,7 @@ must be passed in, otherwise the routine will return false.
 replaceField changes happen immediatly in the database.  To change
 multiple fields in the same PR it is more efficiant to use updatePR.
 
-=head2 appendToField()
+=head2 append_field_content
 
 Expects a PR number, a fieldname, and a append value as arguments, and
 issues the APPN command.  Returns true if field successfully appended
@@ -1381,7 +1381,10 @@ Project hosted at sourceforge, at http://gnatsperl.sourceforge.net
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright (c) 1997-2001, Mike Hoolehan. All Rights Reserved.
+Copyright (c) 2014, Richard Elberger.  All Rights Reserved.
+
+Copyright (c) 1997-2003, Mike Hoolehan. All Rights Reserved.
+
 This module is free software. It may be used, redistributed,
 and/or modified under the same terms as Perl itself.
 

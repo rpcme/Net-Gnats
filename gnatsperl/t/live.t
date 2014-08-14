@@ -24,7 +24,6 @@ $conn1 = ovr_def($conn1);
 
 my $g = Net::Gnats->new($conn1->{server},
                         $conn1->{port});
-my $connected;
 
 is($g->gnatsd_connect, 1, "Connect is OK");
 
@@ -54,6 +53,27 @@ ok(defined $g->get_field_flags('Originator'), 'get_field_flags');
 is($g->get_field_type, undef, 'get_field_type - bad arg');
 ok(defined $g->get_field_type('Responsible'), 'get_field_type');
 ok($g->disconnect, 'Logout of gnats');
+
+
+
+# PR Add/Modify/Delete (Basic)
+my $pr = $g->newPR;
+isa_ok($pr, 'Net::Gnats::PR');
+
+  # my $newPR = $g->newPR();
+  # $newPR->setField("Submitter-Id","developer");
+  # $newPR->setField("Originator","Doctor Wifflechumps");
+  # $newPR->setField("Organization","GNU");
+  # $newPR->setField("Synopsis","Some bug from perlgnats");
+  # $newPR->setField("Confidential","no");
+  # $newPR->setField("Severity","serious");
+  # $newPR->setField("Priority","low");
+  # $newPR->setField("Category","gnatsperl");
+  # $newPR->setField("Class","sw-bug");
+  # $newPR->setField("Description","Something terrible happened");
+  # $newPR->setField("How-To-Repeat","Like this.  Like this.");
+  # $newPR->setField("Fix","Who knows");
+  # $g->submitPR($newPR);
 
 done_testing();
 
