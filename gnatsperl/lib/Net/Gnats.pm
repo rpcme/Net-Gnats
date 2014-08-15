@@ -1,5 +1,5 @@
 package Net::Gnats;
-use v5.18;
+use 5.010_000;
 use utf8;
 use strict;
 use warnings;
@@ -15,8 +15,96 @@ use IO::Handle;
 use Net::Gnats::PR;
 use Net::Gnats::Response;
 
-our $VERSION = '0.07';
-$| =1 ;
+our $VERSION = 0.08;
+local $| =1 ;
+
+Readonly::Scalar my $CODE_GREETING               => 200;
+Readonly::Scalar my $CODE_CLOSING                => 201;
+Readonly::Scalar my $CODE_OK                     => 210;
+Readonly::Scalar my $CODE_SEND_PR                => 211;
+Readonly::Scalar my $CODE_SEND_TEXT              => 212;
+Readonly::Scalar my $CODE_NO_PRS_MATCHED         => 220;
+Readonly::Scalar my $CODE_NO_ADM_ENTRY           => 221;
+Readonly::Scalar my $CODE_PR_READY               => 300;
+Readonly::Scalar my $CODE_TEXT_READY             => 301;
+Readonly::Scalar my $CODE_INFORMATION            => 350;
+Readonly::Scalar my $CODE_INFORMATION_FILLER     => 351;
+Readonly::Scalar my $CODE_NONEXISTENT_PR         => 400;
+Readonly::Scalar my $CODE_EOF_PR                 => 401;
+Readonly::Scalar my $CODE_UNREADABLE_PR          => 402;
+Readonly::Scalar my $CODE_INVALID_PR_CONTENTS    => 403;
+Readonly::Scalar my $CODE_INVALID_FIELD_NAME     => 410;
+Readonly::Scalar my $CODE_INVALID_ENUM           => 411;
+Readonly::Scalar my $CODE_INVALID_DATE           => 412;
+Readonly::Scalar my $CODE_INVALID_FIELD_CONTENTS => 413;
+Readonly::Scalar my $CODE_INVALID_SEARCH_TYPE    => 414;
+Readonly::Scalar my $CODE_INVALID_EXPR           => 415;
+Readonly::Scalar my $CODE_INVALID_LIST           => 416;
+Readonly::Scalar my $CODE_INVALID_DATABASE       => 417;
+Readonly::Scalar my $CODE_INVALID_QUERY_FORMAT   => 418;
+Readonly::Scalar my $CODE_NO_KERBEROS            => 420;
+Readonly::Scalar my $CODE_AUTH_TYPE_UNSUP        => 421;
+Readonly::Scalar my $CODE_NO_ACCESS              => 422;
+Readonly::Scalar my $CODE_LOCKED_PR              => 430;
+Readonly::Scalar my $CODE_GNATS_LOCKED           => 431;
+Readonly::Scalar my $CODE_GNATS_NOT_LOCKED       => 432;
+Readonly::Scalar my $CODE_PR_NOT_LOCKED          => 433;
+Readonly::Scalar my $CODE_INVALID_FTYPE_PROPERTY => 435;
+Readonly::Scalar my $CODE_CMD_ERROR              => 440;
+Readonly::Scalar my $CODE_WRITE_PR_FAILED        => 450;
+Readonly::Scalar my $CODE_ERROR                  => 600;
+Readonly::Scalar my $CODE_TIMEOUT                => 610;
+Readonly::Scalar my $CODE_NO_GLOBAL_CONFIG       => 620;
+Readonly::Scalar my $CODE_INVALID_GLOBAL_CONFIG  => 621;
+Readonly::Scalar my $CODE_NO_INDEX               => 630;
+Readonly::Scalar my $CODE_FILE_ERROR             => 640;
+
+# bits in fieldinfo(field, flags) has (set=yes not-set=no) whether the
+# send command should include the field
+Readonly::Scalar my $SENDINCLUDE                 => 1;
+
+# whether change to a field requires reason
+Readonly::Scalar my $REASONCHANGE                => 2;
+
+# if set, can't be edited
+Readonly::Scalar my $READONLY                    => 4;
+
+# if set, save changes in Audit-Trail
+Readonly::Scalar my $AUDITINCLUDE                => 8;
+
+# whether the send command _must_ include this field
+Readonly::Scalar my $SENDREQUIRED                => 16;
+
+# The possible values of a server reply type.  $REPLY_CONT means that
+# there are more reply lines that will follow, $REPLY_END Is the final
+# line.
+Readonly::Scalar my $REPLY_CONT                  => 1;
+Readonly::Scalar my $REPLY_END                   => 2;
+
+#
+# Various PR field names that should probably not be referenced in
+# here.
+#
+
+# Actually, the majority of uses are probably OK--but we need to map
+# internal names to external ones.  (All of these field names
+# correspond to internal fields that are likely to be around for a
+# long time.)
+#
+
+Readonly::Scalar my $CATEGORY_FIELD              => 'Category';
+Readonly::Scalar my $SYNOPSIS_FIELD              => 'Synopsis';
+Readonly::Scalar my $SUBMITTER_ID_FIELD          => 'Submitter-Id';
+Readonly::Scalar my $ORIGINATOR_FIELD            => 'Originator';
+Readonly::Scalar my $AUDIT_TRAIL_FIELD           => 'Audit-Trail';
+Readonly::Scalar my $RESPONSIBLE_FIELD           => 'Responsible';
+Readonly::Scalar my $LAST_MODIFIED_FIELD         => 'Last-Modified';
+
+Readonly::Scalar my $NUMBER_FIELD                => 'builtinfield:Number';
+Readonly::Scalar my $STATE_FIELD                 => 'State';
+Readonly::Scalar my $UNFORMATTED_FIELD           => 'Unformatted';
+Readonly::Scalar my $RELEASE_FIELD               => 'Release';
+Readonly::Scalar my $REPLYTO_FIELD               => 'Reply-To';
 
 BEGIN {
   # Create aliases to deprecate 'old' style method calls.
@@ -109,7 +197,7 @@ sub new {
     return $self;
 }
 
-sub _debug_gnatsd {
+sub debug_gnatsd {
   $debug_gnatsd = 1;
 }
 
@@ -145,8 +233,8 @@ sub gnatsd_connect {
     _debug('INIT: [' . $response->as_string . ']');
 
     # Make sure we got a 200 code.
-    if ($response->code != 200) {
-      warn "? Error: Unknown gnatsd connection response: $response";
+    if ($response->code != $CODE_GREETING) {
+      carp "? Error: Unknown gnatsd connection response: $response";
       return 0;
     }
 
@@ -215,7 +303,7 @@ sub list_states {
 sub list_fieldnames {
   my ( $self ) = @_;
   my ($code, $response) = $self->_do_gnats_cmd('LIST FIELDNAMES');
-  return undef if not $self->_is_code_ok($code);
+  return if not $self->_is_code_ok($code);
   return $response;
 }
 
@@ -245,7 +333,7 @@ sub get_field_type {
 #  }
 
   my ($code, $response) = $self->_do_gnats_cmd("FTYP $field");
-  if ( $code == 410 ) { return undef; }
+  if ( $code == $CODE_INVALID_FIELD_NAME ) { return; }
 
 #  if ( ! $self->_is_code_ok($code) ) {
 #    $self->_mark_error($code, $response);
@@ -277,7 +365,7 @@ sub get_field_typeinfo {
 
 
   my ($code, $response) = $self->_do_gnats_cmd("FTYPINFO $field $property");
-  if ( $code == 435 ) { return undef; }
+  if ( $code == $CODE_INVALID_FTYPE_PROPERTY ) { return; }
 
   # if (not exists($self->{fieldData}->{fields}->{$field}->{typeInfo})) {
   #   if ($self->_is_code_ok($code)) {
@@ -309,7 +397,7 @@ sub get_field_flags {
 
   my ($code, $response) = $self->_do_gnats_cmd("FIELDFLAGS $field");
 
-  if (defined $flag and $response =~ /$flag/) { return 1; }
+  if (defined $flag and $response =~ /$flag/sxm) { return 1; }
 
   return $response;
 }
@@ -349,19 +437,9 @@ sub validate_field {
 
 sub get_field_default {
   my ( $self, $field ) = @_;
-
-  if (not exists($self->{fieldData}->{fields}->{$field}->{default})) {
-    my ($code, $response) = $self->_do_gnats_cmd("INPUTDEFAULT $field");
-    if ($self->_is_code_ok($code)) {
-      chomp $response;
-      $response =~ s/^350\s//sxm;
-      $self->{fieldData}->{fields}->{$field}->{default} = $response;
-    } else {
-      $self->_mark_error($code, $response);
-      return;
-    }
-  }
-  return $self->{fieldData}->{fields}->{$field}->{default};
+  my ($code, $response) = $self->_do_gnats_cmd("INPUTDEFAULT $field");
+  if (not $self->_is_code_ok($code)) { return }
+  return @{ $response }[0];
 }
 
 
@@ -710,7 +788,8 @@ sub getPRByNumber {
 
     ($code, $response) = $self->_do_gnats_cmd("QUER $num");
 
-    if ($code == 220 and @{$response}[0] eq 'No PRs match.' ) { return undef; }
+    if ( $code == $CODE_NO_PRS_MATCHED and
+         @{$response}[0] eq 'No PRs match.' ) { return; }
 
     if (not $self->_is_code_ok($code)) {
         $self->_mark_error($code, $response);
@@ -876,7 +955,7 @@ sub _read_multi {
   my ( $self ) = @_;
   my $raw = [];
   while ( my $line = <SOCK> ) {
-    if ( $line =~ /^\.\r/) { last; }
+    if ( $line =~ /^[.]\r/sxm) { last; }
     $line = $self->_read_clean($line);
     _debug('READ: [' . __LINE__ . '][' . $line . ']');
     my $parts = $self->_read_decompose( $line );
@@ -906,11 +985,11 @@ sub _read {
 
   $response->code( @{ $result }[0] );
 
-  if (not defined $response->code) { return undef; }
+  if (not defined $response->code) { return; }
 
-  unless ( $response->code == 300 or  # do not need 'PRs follow.'
-           $response->code == 301 or  # do not need 'List follows.'
-           $response->code == 351 ) { # do not need ident for single value
+  unless ( $response->code == $CODE_PR_READY           or
+           $response->code == $CODE_TEXT_READY         or
+           $response->code == $CODE_INFORMATION_FILLER ) {
     push @{ $raw }, @{$result}[2];
   }
 
@@ -923,7 +1002,7 @@ sub _read {
 
 sub _read_decompose {
   my ( $self, $raw ) = @_;
-  my @result = $raw =~ /^(\d\d\d)([- ]?)(.*$)/;
+  my @result = $raw =~ /^(\d\d\d)([- ]?)(.*$)/sxm;
   return \@result;
 }
 
@@ -933,7 +1012,7 @@ sub _read_has_more {
     if ( @{$parts}[1] eq '-' ) {
       return 1;
     }
-    elsif ( @{$parts}[0] >= 300 and @{$parts}[0] < 350) {
+    elsif ( @{$parts}[0] >= $CODE_PR_READY and @{$parts}[0] < $CODE_INFORMATION) {
       return 1;
     }
     return; # does not pass 'continue' criteria
@@ -944,7 +1023,7 @@ sub _read_has_more {
 sub _read_clean {
   my ( $self, $line ) = @_;
   $line =~ s/[\r\n]//gsxm;
-  $line =~ s/^\.\././;
+  $line =~ s/^[.][.]/./sxm;
   return $line;
 }
 
@@ -997,93 +1076,6 @@ sub _debug {
 
 # Autoload methods go after =cut, and are processed by the autosplit program.
 
-
-Readonly::Scalar my $CODE_GREETING               => 200;
-Readonly::Scalar my $CODE_CLOSING                => 201;
-Readonly::Scalar my $CODE_OK                     => 210;
-Readonly::Scalar my $CODE_SEND_PR                => 211;
-Readonly::Scalar my $CODE_SEND_TEXT              => 212;
-Readonly::Scalar my $CODE_NO_PRS_MATCHED         => 220;
-Readonly::Scalar my $CODE_NO_ADM_ENTRY           => 221;
-Readonly::Scalar my $CODE_PR_READY               => 300;
-Readonly::Scalar my $CODE_TEXT_READY             => 301;
-Readonly::Scalar my $CODE_INFORMATION            => 350;
-Readonly::Scalar my $CODE_INFORMATION_FILLER     => 351;
-Readonly::Scalar my $CODE_NONEXISTENT_PR         => 400;
-Readonly::Scalar my $CODE_EOF_PR                 => 401;
-Readonly::Scalar my $CODE_UNREADABLE_PR          => 402;
-Readonly::Scalar my $CODE_INVALID_PR_CONTENTS    => 403;
-Readonly::Scalar my $CODE_INVALID_FIELD_NAME     => 410;
-Readonly::Scalar my $CODE_INVALID_ENUM           => 411;
-Readonly::Scalar my $CODE_INVALID_DATE           => 412;
-Readonly::Scalar my $CODE_INVALID_FIELD_CONTENTS => 413;
-Readonly::Scalar my $CODE_INVALID_SEARCH_TYPE    => 414;
-Readonly::Scalar my $CODE_INVALID_EXPR           => 415;
-Readonly::Scalar my $CODE_INVALID_LIST           => 416;
-Readonly::Scalar my $CODE_INVALID_DATABASE       => 417;
-Readonly::Scalar my $CODE_INVALID_QUERY_FORMAT   => 418;
-Readonly::Scalar my $CODE_NO_KERBEROS            => 420;
-Readonly::Scalar my $CODE_AUTH_TYPE_UNSUP        => 421;
-Readonly::Scalar my $CODE_NO_ACCESS              => 422;
-Readonly::Scalar my $CODE_LOCKED_PR              => 430;
-Readonly::Scalar my $CODE_GNATS_LOCKED           => 431;
-Readonly::Scalar my $CODE_GNATS_NOT_LOCKED       => 432;
-Readonly::Scalar my $CODE_PR_NOT_LOCKED          => 433;
-Readonly::Scalar my $CODE_CMD_ERROR              => 440;
-Readonly::Scalar my $CODE_WRITE_PR_FAILED        => 450;
-Readonly::Scalar my $CODE_ERROR                  => 600;
-Readonly::Scalar my $CODE_TIMEOUT                => 610;
-Readonly::Scalar my $CODE_NO_GLOBAL_CONFIG       => 620;
-Readonly::Scalar my $CODE_INVALID_GLOBAL_CONFIG  => 621;
-Readonly::Scalar my $CODE_NO_INDEX               => 630;
-Readonly::Scalar my $CODE_FILE_ERROR             => 640;
-
-# bits in fieldinfo(field, flags) has (set=yes not-set=no) whether the
-# send command should include the field
-Readonly::Scalar my $SENDINCLUDE                 => 1;
-
-# whether change to a field requires reason
-Readonly::Scalar my $REASONCHANGE                => 2;
-
-# if set, can't be edited
-Readonly::Scalar my $READONLY                    => 4;
-
-# if set, save changes in Audit-Trail
-Readonly::Scalar my $AUDITINCLUDE                => 8;
-
-# whether the send command _must_ include this field
-Readonly::Scalar my $SENDREQUIRED                => 16;
-
-# The possible values of a server reply type.  $REPLY_CONT means that
-# there are more reply lines that will follow, $REPLY_END Is the final
-# line.
-Readonly::Scalar my $REPLY_CONT                  => 1;
-Readonly::Scalar my $REPLY_END                   => 2;
-
-#
-# Various PR field names that should probably not be referenced in
-# here.
-#
-
-# Actually, the majority of uses are probably OK--but we need to map
-# internal names to external ones.  (All of these field names
-# correspond to internal fields that are likely to be around for a
-# long time.)
-#
-
-Readonly::Scalar my $CATEGORY_FIELD              => 'Category';
-Readonly::Scalar my $SYNOPSIS_FIELD              => 'Synopsis';
-Readonly::Scalar my $SUBMITTER_ID_FIELD          => 'Submitter-Id';
-Readonly::Scalar my $ORIGINATOR_FIELD            => 'Originator';
-Readonly::Scalar my $AUDIT_TRAIL_FIELD           => 'Audit-Trail';
-Readonly::Scalar my $RESPONSIBLE_FIELD           => 'Responsible';
-Readonly::Scalar my $LAST_MODIFIED_FIELD         => 'Last-Modified';
-
-Readonly::Scalar my $NUMBER_FIELD                => 'builtinfield:Number';
-Readonly::Scalar my $STATE_FIELD                 => 'State';
-Readonly::Scalar my $UNFORMATTED_FIELD           => 'Unformatted';
-Readonly::Scalar my $RELEASE_FIELD               => 'Release';
-Readonly::Scalar my $REPLYTO_FIELD               => 'Reply-To';
 
 
 1;

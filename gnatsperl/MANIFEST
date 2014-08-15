@@ -1,5 +1,6 @@
 lib/Net/Gnats.pm
 lib/Net/Gnats/PR.pm
+lib/Net/Gnats/Response.pm
 Changes
 MANIFEST
 Makefile.PL

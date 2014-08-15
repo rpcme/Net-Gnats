@@ -1,4 +1,5 @@
 package Net::Gnats::Response;
+use 5.010_000;
 use utf8;
 use strict;
 use warnings;
