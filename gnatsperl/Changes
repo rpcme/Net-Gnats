@@ -1,5 +1,10 @@
 Revision history for Perl extension Net::Gnats.
 
+0.10
+
+- Remove ExtUtils::MakeMaker::Coverage dependency because it seems as
+  though it's not available on CPAN any longer.
+
 0.09
 
 - Fixed incorrect setting in Makefile.PL causing META.json not being
