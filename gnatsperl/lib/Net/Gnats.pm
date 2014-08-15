@@ -708,6 +708,9 @@ sub getPRByNumber {
     }
 
     ($code, $response) = $self->_do_gnats_cmd("QUER $num");
+
+    if ($code == 220 and @{$response}[0] eq 'No PRs match.' ) { return undef; }
+
     if (not $self->_is_code_ok($code)) {
         $self->_mark_error($code, $response);
         return;

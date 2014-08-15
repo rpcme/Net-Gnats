@@ -53,17 +53,14 @@ sub new {
 }
 
 sub setField {
-    my $self = shift;
-    my $field = shift;
-    my $value = shift;
-    my $reason = shift;
+    my ($self, $field, $value, $reason) = @_;
     $self->{fields}->{$field} = $value;
     $self->{fields}->{$field."-Changed-Why"} = $reason
       if (defined($reason)); # TODO: Anyway to find out if requireChangeReason?
 }
+
 sub getField {
-    my $self = shift;
-    my $field = shift;
+    my ( $self, $field ) = @_;
     return $self->{fields}->{$field};
 }
 
@@ -155,9 +152,9 @@ sub parse {
     next if /^300 PRs follow./;
     chomp($_);
     $_ .= "\n";
-    if(!/^([>\w\-]+):\s*(.*)\s*$/) {
+    if (! /^([>\w\-]+):\s*(.*)\s*$/ ) {
       if ($hdrmulti ne '') {
-        $fields{$hdrmulti} .= $_;
+        $fields{ $hdrmulti } .= $_;
       }
       next;
     }
@@ -170,7 +167,7 @@ sub parse {
     $cleanhdr =~ s/^>([^:]*).*$/$1/;
 
     if ($self->{__gnatsObj}->isValidField($cleanhdr)) {
-      if ($self->{__gnatsObj}->getFieldType($cleanhdr) eq 'MultiText') {
+      if ( $self->{__gnatsObj}->getFieldType($cleanhdr) eq 'MultiText' ) {
         $hdrmulti = $ghdr;
         $fields{$ghdr} = "";
       }
@@ -226,7 +223,7 @@ sub parse {
 
   foreach my $field (keys %fields) {
     $fields{$field} =~ s/\r// if defined($fields{$field});
-    $self->setField($field,$fields{$field})
+    $self->setField($field, $fields{$field})
   }
 
 }

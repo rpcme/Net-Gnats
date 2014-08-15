@@ -7,7 +7,7 @@ unless ( $ENV{'GNATS_MAINTAINER'} ) {
   plan skip_all => "Live tests by default are skipped, maintainer only.";
 }
 else {
-  plan tests => 21;
+  plan tests => 22;
 }
 
 use Net::Gnats;
@@ -87,6 +87,11 @@ $g->update_pr($pr2);
 $g->check_pr( $pr2->unparse, 'purpose' );
 $g->lockMainDatabase;
 $g->unlockMainDatabase;
+
+# regress issue 9 - hopefully you don't have more PRs than this
+my $pr3 = $g->getPRByNumber('99999999');
+is($pr3, undef, 'undefined pr deserves an undef');
+
 
 ok($g->disconnect, 'Logout of gnats');
 
