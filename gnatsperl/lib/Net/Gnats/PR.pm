@@ -3,6 +3,8 @@ use utf8;
 use strict;
 use warnings;
 use Carp;
+use MIME::Base64;
+
 $| = 1;
 require Exporter;
 use AutoLoader qw(AUTOLOAD);
@@ -134,116 +136,88 @@ sub fix_email_addrs
   $addrs;
 }
 
+sub parse_line {
+  my ( $self, $line, $known_fields) = @_;
+  my $result = [];
+  my @found = $line =~ /^>([\w\-]+):\s*(.*)$/;
+
+  if ( not defined $found[0] ) {
+    @{ $result }[1] = $line;
+    return $result;
+  }
+
+  my $found = grep { $_ eq $found[0] } @{ $known_fields };
+
+  if ( $found == 0 ) {
+    @{ $result }[1] = $line;
+    return $result;
+  }
+
+  @{ $result }[0] =  $found[0];
+  $found[1] =~ s/\s+$//;
+  @{ $result }[1] = $found[1];
+  return $result;
+}
+
 sub parse {
   my $self  = shift;
-  # 9/18/99 kenstir: This two-liner can almost replace the next 30 or so
-  # lines of code, but not quite.  It strips leading spaces from multiline
-  # fields.
-  #my $prtext = join("\n", @_);
-  #my(%fields) = ('envelope' => split /^>(\S*?):\s*/m, $prtext);
-  #  my $prtext = join("\n", @_);
-  #  my(%fields) = ('envelope' => split /^>(\S*?):(?: *|\n)/m, $prtext);
 
-  my $debug = 0;
+  # Get all known fields and hashify them.
+  my $fields_known = $self->{__gnatsObj}->list_fieldnames;
+  my $fields_have = {};
 
-  my $hdrmulti = 'envelope';
-  my ( %fields );
+  my ( $field_last );
+  my $field_multi = 0;
+
   foreach (@_) {
-    next if /^300 PRs follow./;
-    chomp($_);
-    $_ .= "\n";
-    if (! /^([>\w\-]+):\s*(.*)\s*$/ ) {
-      if ($hdrmulti ne '') {
-        $fields{ $hdrmulti } .= $_;
-      }
-      next;
-    }
-    my ($hdr, $arg, $ghdr) = ($1, $2, "*notvalid*");
-    if ($hdr =~ /^>(.*)$/) {
-      $ghdr = $1;
-    }
+    my $result = $self->parse_line( $_, $fields_known );
 
-    my $cleanhdr = $ghdr;
-    $cleanhdr =~ s/^>([^:]*).*$/$1/;
+    # known header field found, save.
+    if ( defined @{ $result }[0] ) {
+      $fields_have->{ @{ $result }[0] } = @{ $result }[1];
 
-    if ($self->{__gnatsObj}->isValidField($cleanhdr)) {
-      if ( $self->{__gnatsObj}->getFieldType($cleanhdr) eq 'MultiText' ) {
-        $hdrmulti = $ghdr;
-        $fields{$ghdr} = "";
+      # if the last field was a multi, remove its auto newline
+      if ( $field_multi ) {
+        $fields_have->{ $field_last } =~ s/\n$//;
       }
-      else {
-        $hdrmulti = '';
-        $fields{$ghdr} = $arg;
-      }
+      $field_multi = 0;
+      $field_last = @{ $result }[0];
     }
-    elsif ($hdrmulti ne '') {
-      $fields{ $hdrmulti } .= $_;
-    }
-
-    # Grab a few fields out of the envelope as it flies by
-    # 8/25/99 ehl: Grab these fields only out of the envelope, not
-    # any other multiline field.
-    if ( $hdrmulti eq 'envelope' &&
-       ($hdr eq "Reply-To" || $hdr eq "From"))
-    {
-      $arg = fix_email_addrs($arg); # TODO: Should we really do this?
-      $fields{$hdr} = $arg;
-      #print "storing, hdr = $hdr, arg = $arg\n";
+    # known header field not found, append to last.
+    else {
+      if ( not defined $field_last ) { next; }
+      $field_multi = 1;
+      $fields_have->{ $field_last } .= @{ $result }[1] . "\n";
     }
   }
 
-  # 5/8/99 kenstir: To get the reporter's email address, only
-  # $fields{'Reply-to'} is consulted.  Initialized it from the 'From'
-  # header if it's not set, then discard the 'From' header.
-  $fields{'Reply-To'} = $fields{'Reply-To'} || $fields{'From'};
-  delete $fields{'From'};
+  $fields_have->{'Reply-To'} = $fields_have->{'Reply-To'} || $fields_have->{'From'};
+  delete $fields_have->{'From'};
 
-  # Ensure that the pseudo-fields are initialized to avoid perl warnings.
-  $fields{'X-GNATS-Notify'} ||= '';
+  $fields_have->{'X-GNATS-Notify'} ||= '';
 
   # 3/30/99 kenstir: For some reason Unformatted always ends up with an
   # extra newline here.
-  $fields{$UNFORMATTED_FIELD} ||= ''; # Default to empty value
-  $fields{$UNFORMATTED_FIELD} =~ s/\n$//;
+  $fields_have->{$UNFORMATTED_FIELD} ||= ''; # Default to empty value
+  $fields_have->{$UNFORMATTED_FIELD} =~ s/\n$//;
 
   # Decode attachments stored in Unformatted field.
   my $any_attachments = 0;
-  if (can_do_mime()) {
-    my(@attachments) = split(/$attachment_delimiter/, $fields{$UNFORMATTED_FIELD});
-    # First element is any random text which precedes delimited attachments.
-    $fields{$UNFORMATTED_FIELD} = shift(@attachments);
-    foreach my $attachment (@attachments) {
-      warn "att=>$attachment<=\n" if $debug;
+
+  my(@attachments) = split /$attachment_delimiter/, $fields_have->{$UNFORMATTED_FIELD};
+
+  # First element is any random text which precedes delimited attachments.
+  $fields_have->{$UNFORMATTED_FIELD} = shift @attachments;
+  foreach my $attachment (@attachments) {
       $any_attachments = 1;
-      # Strip leading spaces on each line of the attachment
       $attachment =~ s/^[ ]//mg;
-      add_decoded_attachment_to_pr(\%fields, decode_attachment($attachment));
+      add_decoded_attachment_to_pr($fields_have, decode_attachment($attachment));
     }
+
+  foreach my $field (keys %{ $fields_have }) {
+    $fields_have->{$field} =~ s/\r// if defined $fields_have->{ $field };
+    $self->setField($field, $fields_have->{$field})
   }
-
-  foreach my $field (keys %fields) {
-    $fields{$field} =~ s/\r// if defined($fields{$field});
-    $self->setField($field, $fields{$field})
-  }
-
-}
-
-
-# Return true if module MIME::Base64 is available.  If available, it's
-# loaded the first time this sub is called.
-my $can_do_mime = 0;
-sub can_do_mime {
-
-  return $can_do_mime if (defined($can_do_mime));
-
-  eval 'use MIME::Base64;';
-  if ($@) {
-    warn "NOTE: Can't use file upload feature without MIME::Base64 module\n";
-      $can_do_mime = 0;
-  } else {
-    $can_do_mime = 1;
-  }
-  $can_do_mime;
 }
 
 # unparse -

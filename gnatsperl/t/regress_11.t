@@ -52,8 +52,6 @@ my $pr1_result = join "\n", @{ $g->submit_pr($pr1) };
 my $pr2 = $g->getPRByNumber($pr1_result);
 
 is($pr2->getField('Description'), $desc, 'multi works ok');
-use Data::Dumper;
-print Dumper $pr2->{fields};
 
 ok($g->disconnect, 'Logout of gnats');
 

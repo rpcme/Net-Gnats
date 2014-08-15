@@ -72,14 +72,11 @@ $pr1->setField('Synopsis','Some bug from perlgnats');
   # $newPR->setField("How-To-Repeat","Like this.  Like this.");
   # $newPR->setField("Fix","Who knows");
 
-use Data::Dumper;
-
 my $pr1_result = join "\n", @{ $g->submit_pr($pr1) };
 ok($pr1_result > 0, 'we have a pr');
 
 
 my $pr2 = $g->getPRByNumber($pr1_result);
-print Dumper $pr2;
 
 $pr2->setField('Synopsis', 'changing you');
 $g->update_pr($pr2);
