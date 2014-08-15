@@ -15,7 +15,7 @@ use IO::Handle;
 use Net::Gnats::PR;
 use Net::Gnats::Response;
 
-our $VERSION = 0.08;
+our $VERSION = 0.09;
 local $| =1 ;
 
 Readonly::Scalar my $CODE_GREETING               => 200;

@@ -1,9 +1,15 @@
 Revision history for Perl extension Net::Gnats.
 
+0.09
+
+- Fixed incorrect setting in Makefile.PL causing META.json not being
+  added to dist.
+
 0.08
 
-- Fixed version in PR.pm for correct CPAN indexing purposes
-
+- Fixed VERSION in PR.pm for correct CPAN indexing purposes
+- Change Perl version requirement to 5.10
+- Add non-core dependencies to Makefile.PL
 
 0.07
 

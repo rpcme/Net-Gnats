@@ -10,5 +10,4 @@ WriteMakefile(
   'CONFIGURE_REQUIRES' => {'ExtUtils::MakeMaker::Coverage' => '0.03',
                           },
   'MIN_PERL_VERSION'   => '5.010_000',
-  'NO_META'            => 'false',
 );
