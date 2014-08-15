@@ -1,5 +1,31 @@
 Revision history for Perl extension Net::Gnats.
 
+0.07
+
+General:
+
+- Added unit tests
+- Changed to proper source structure
+
+Net/Gnats.pm
+
+- Massive amount of refactoring around PBP.
+- Removed unecessary 'dead' code
+- Changed documentation according to PBP changes
+- Began removing old 'data caching' mechanism, metadata needs to be
+  captured on a per db basis
+- fixed/regressed bugs 4, 5, 7, 8, 9, 11 and created unit tests. 
+
+Net/Gnats/PR.pm
+
+- reconstructed parse routine
+- some PBP refactoring
+
+Net/Gnats/Response.pm
+
+- new module to hold all socket response (raw, code) and eventually
+will replace old procedural method of capturing sets of responses.
+
 0.06
 
 Gnats.pm

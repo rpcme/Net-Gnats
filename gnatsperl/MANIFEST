@@ -1,9 +1,13 @@
-Net/Gnats.pm
-Net/Gnats/PR.pm
+lib/Net/Gnats.pm
+lib/Net/Gnats/PR.pm
 Changes
 MANIFEST
 Makefile.PL
 README
 t/test.t
-t/basic.t
+t/live.t
+t/prparser.t
+t/response.t
+t/regress_8.t
+t/regress_11.t
 
