@@ -57,7 +57,7 @@ ok(defined $g->get_field_type('Responsible'), 'get_field_type');
 
 
 # PR Add/Modify/Delete (Basic)
-my $pr1 = $g->newPR;
+my $pr1 = $g->new_pr;
 isa_ok($pr1, 'Net::Gnats::PR');
 $pr1->setField('Submitter-Id','developer');
 $pr1->setField('Originator', 'Doctor Wifflechumps');
@@ -76,7 +76,7 @@ my $pr1_result = join "\n", @{ $g->submit_pr($pr1) };
 ok($pr1_result > 0, 'we have a pr');
 
 
-my $pr2 = $g->getPRByNumber($pr1_result);
+my $pr2 = $g->get_pr_by_number($pr1_result);
 
 $pr2->setField('Synopsis', 'changing you');
 $g->update_pr($pr2);
@@ -86,7 +86,7 @@ $g->lockMainDatabase;
 $g->unlockMainDatabase;
 
 # regress issue 9 - hopefully you don't have more PRs than this
-my $pr3 = $g->getPRByNumber('99999999');
+my $pr3 = $g->get_pr_by_number('99999999');
 is($pr3, undef, 'undefined pr deserves an undef');
 
 

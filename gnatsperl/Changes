@@ -1,5 +1,9 @@
 Revision history for Perl extension Net::Gnats.
 
+0.11
+
+- Add Readonly as a MakeMaker prerequisite due to CPAN tester failures.
+
 0.10
 
 - Remove ExtUtils::MakeMaker::Coverage dependency because it seems as

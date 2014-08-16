@@ -39,7 +39,7 @@ is($g->reset_server, 1, 'Reset is OK');
 
 # check if we can create a PR with this
 my $desc = "This is a multiline\nthat later\n> has an identifier";
-my $pr1 = $g->newPR;
+my $pr1 = $g->new_pr;
 
 isa_ok($pr1, 'Net::Gnats::PR');
 $pr1->setField('Submitter-Id', 'developer');
@@ -49,7 +49,7 @@ $pr1->setField('Synopsis', 'Some bug from perlgnats');
 
 my $pr1_result = join "\n", @{ $g->submit_pr($pr1) };
 
-my $pr2 = $g->getPRByNumber($pr1_result);
+my $pr2 = $g->get_pr_by_number($pr1_result);
 
 is($pr2->getField('Description'), $desc, 'multi works ok');
 
