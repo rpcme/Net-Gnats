@@ -3,14 +3,9 @@ use 5.010_000;
 use utf8;
 use strict;
 use warnings;
-our $VERSION = '0.1';
+our $VERSION = '0.10';
 
-=item new()
-
-Constructor for the Response object.
-
-=cut
-
+# see perldoc for documentation
 sub new {
   my ($class, $param) = @_;
   my $self = bless {}, $class;
@@ -19,38 +14,21 @@ sub new {
   return $self;
 }
 
-=item raw()
-
-Accessor for raw result data.
-
-=cut
-
+# see perldoc for documentation
 sub raw {
   my ($self, $value) = @_;
   if (defined $value) { $self->{raw} = $value; }
   return $self->{raw};
 }
 
-=item code()
-
-Accessor for the result code.
-
-=cut
-
+# see perldoc for documentation
 sub code {
   my ($self, $value) = @_;
   if (defined $value) { $self->{code} = $value; }
   return $self->{code};
 }
 
-=item as_list()
-
-Assumes the Gnatsd payload response is a 'list' and parses it as so.
-
-Returns: Anonymous array of list items.
-
-=cut
-
+# see perldoc for documentation
 sub as_list {
   my ($self) = @_;
   my $tmp = $self->raw;
@@ -61,6 +39,7 @@ sub as_list {
   return \@lines;
 }
 
+# see perldoc for documentation
 sub as_string {
   my ( $self ) = @_;
   return join "\n", @{ $self->raw };
@@ -68,15 +47,17 @@ sub as_string {
 
 1;
 
+__END__
+
 =encoding utf8
 
 =head1 NAME
 
-Response.pm - A Gnats payload class.
+Net::Gnats::Response - A Gnats payload class.
 
 =head1 VERSION
 
-0.1
+0.11
 
 =head1 DESCRIPTION
 
@@ -96,9 +77,35 @@ Gnatsd. Enables an easier payload method.
   $response->raw($data);
   $response->code($code);
 
+=head1 INCOMPATIBILITIES
+
+None.
+
 =head1 SUBROUTINES/METHODS
 
+=over
 
+=item new()
+
+Constructor for the Response object.
+
+=item raw()
+
+Accessor for raw result data.
+
+=item $response->code()
+
+Accessor for the result code.
+
+=item $response->as_list()
+
+Assumes the Gnatsd payload response is a 'list' and parses it as so.
+
+Returns: Anonymous array of list items.
+
+=item $response->as_string()
+
+=back
 
 =head1 DIAGNOSTICS
 
@@ -125,5 +132,3 @@ Richard Elberger, riche@cpan.org
 License: GPL V3
 
 (c) 2014 Richard Elberger
-
-None.

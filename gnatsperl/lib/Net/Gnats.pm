@@ -442,21 +442,24 @@ sub get_field_validators {
 
 
 sub validate_field {
-    my ( $self, $field, $input ) = @_;
+  my ( $self, $field, $input ) = @_;
 
-    my ($code, $response) = $self->_do_gnats_cmd("VFLD $field");
-    if ($self->_is_code_ok($code)) {
-        ($code, $response) = $self->_do_gnats_cmd($input . $NL . q{.});
-        if ($self->_is_code_ok($code)) {
-            return 1;
-        } else {
-            $self->_mark_error($code, $response);
-            return 0;
-        }
-    } else {
-        $self->_mark_error($code, $response);
-        return 0;
-    }
+  my ($code, $response) = $self->_do_gnats_cmd("VFLD $field");
+
+  if ( $code != $CODE_SEND_TEXT ) { # MUST respond with 212 to continue.
+    carp('ERROR: [' . $code . '] when calling VFLD on [' . $field . ']');
+    return;
+  }
+
+  ($code, $response) = $self->_do_gnats_cmd($input . $NL . q{.});
+
+  if ( $code != $CODE_OK ) {
+    carp('ERROR: [' . $code . '] when supplying VFLD text on [' . $field . ']');
+    return;
+  }
+
+  # Return last response object in future
+  return 1;
 }
 
 sub get_field_default {
@@ -472,9 +475,11 @@ sub reset_server {
 
   my ($code, $response) = $self->_do_gnats_cmd('RSET');
 
-  if ( not $self->_is_code_ok($code) ) {
-    $self->_mark_error($code, $response);
-    return 0;
+  # CODE_CMD_ERROR (440) can never happen since we constrain no args in code.
+
+  if ( $code >= $CODE_ERROR ) {
+    carp( 'ERROR [' . $code . ']: ' . $response );
+    return;
   }
 
   return 1;
@@ -482,64 +487,146 @@ sub reset_server {
 
 
 sub lock_main_database {
-    my ( $self ) = @_;
-    my $code; my $response;
-    ($code, $response) = $self->_do_gnats_cmd('LKDB');
-    if ($self->_is_code_ok($code)) {
-        return 1;
-    } else {
-        $self->_mark_error($code, $response);
-        return 0;
-    }
+  my ( $self ) = @_;
+
+  my ($code, $response) = $self->_do_gnats_cmd('LKDB');
+
+  # CODE_CMD_ERROR (440) can never happen since we constrain no args in code.
+
+  if ( $code == $CODE_GNATS_LOCKED ) {
+    carp('ERROR: CODE_GNATS_LOCKED: Gnats database already locked.');
+    return;
+  }
+
+  # Test this with a user who does not have privelege to lock database.
+  if ( $code >= $CODE_ERROR ) {
+    carp( 'ERROR [' . $code . ']: ' . $response );
+    return;
+  }
+
+  return 1;
 }
 
 sub unlock_main_database {
     my ( $self ) = @_;
     my $code; my $response;
     ($code, $response) = $self->_do_gnats_cmd('UNDB');
-    if ($self->_is_code_ok($code)) {
-        return 1;
-    } else {
-        $self->_mark_error($code, $response);
-        return 0;
-    }
+
+
+  # CODE_CMD_ERROR (440) can never happen since we constrain no args in code.
+
+  if ( $code == $CODE_GNATS_NOT_LOCKED ) {
+    carp('ERROR: CODE_GNATS_NOT_LOCKED: Gnats database not locked.');
+    return;
+  }
+
+  # Test this with a user who does not have privelege to lock database.
+  if ( $code >= $CODE_ERROR ) {
+    carp( 'ERROR [' . $code . ']: ' . $response );
+    return;
+  }
+
+  return 1;
 }
 
 sub lock_pr {
-    my ( $self, $pr, $user ) = @_;
+  my ( $self, $pr_number, $user ) = @_;
 
-    my ($code, $response) = $self->_do_gnats_cmd("LOCK $pr $user");
-    if ($self->_is_code_ok($code)) {
-        my $prl = $self->newPR();
-        $prl->parse( split $NL, $response );
-        return $prl;
-    } else {
-        $self->_mark_error($code, $response);
-        return 0;
-    }
+  my ($code, $response) = $self->_do_gnats_cmd("LOCK $pr_number $user");
+
+  if ( $code == $CODE_CMD_ERROR ) {
+    carp( 'ERROR: CODE_CMD_ERROR: ' . $response );
+    return;
+  }
+
+  if ( $code == $CODE_NONEXISTENT_PR ) {
+    carp( 'ERROR: CODE_NONEXISTENT_PR: ' . $response );
+    return;
+  }
+
+  if ( $code == $CODE_LOCKED_PR ) {
+    carp( 'ERROR: CODE_LOCKED_PR: ' . $response );
+    return;
+  }
+
+  # Test this with a user who does not have privelege to lock the PR.
+  if ( $code >= $CODE_ERROR ) {
+    carp( 'ERROR [' . $code . ']: ' . $response );
+    return;
+  }
+
+  # CODE_PR_READY (300)
+  my $pr = Net::Gnats::PR->new( $self );
+  $pr->parse( $response );
+  return $pr;
 }
 
 sub unlock_pr {
-    my ( $self, $pr ) = @_;
+  my ( $self, $pr ) = @_;
 
-    my ($code, $response) = $self->_do_gnats_cmd("UNLK $pr");
-    if ($self->_is_code_ok($code)) {
-        return 1;
-    } else {
-        $self->_mark_error($code, $response);
-        return 0;
-    }
+  if ( not defined $pr ) {
+    carp( 'ERROR: unlock_pr requires PR number' );
+    return;
+  }
+
+  my ($code, $response) = $self->_do_gnats_cmd( 'UNLK ' . $pr );
+
+  if ( $code == $CODE_CMD_ERROR ) {
+    carp( 'ERROR: CODE_CMD_ERROR: ' . $response );
+    return;
+  }
+
+  if ( $code == $CODE_NONEXISTENT_PR ) {
+    carp( 'ERROR: CODE_NONEXISTENT_PR: ' . $response );
+    return;
+  }
+
+  if ( $code == $CODE_PR_NOT_LOCKED ) {
+    carp( 'ERROR: CODE_PR_NOT_LOCKED: ' . $response );
+    return;
+  }
+
+  # Test this with a user who does not have privelege to lock the PR.
+  if ( $code >= $CODE_ERROR ) {
+    carp( 'ERROR [' . $code . ']: ' . $response );
+    return;
+  }
+
+  # CODE_OK
+  return 1;
 }
 
 sub delete_pr {
   my ( $self, $pr ) = @_;
 
-  my ($code, $response) = $self->_do_gnats_cmd("DELETE $pr");
-  if ($self->_is_code_ok($code)) {
+  my ($code, $response) = $self->_do_gnats_cmd('DELETE ' . $pr->getField('Number'));
+
+  if ( $code == $CODE_OK ) {
     return 1;
   }
-  $self->_mark_error($code, $response);
-  return 0;
+
+  if ( $code == $CODE_NO_ACCESS ) {
+    carp('You do not have access to delete this PR.');
+    return;
+  }
+
+  if ( $code == $CODE_LOCKED_PR ) {
+    carp('You cannot delete a locked PR.');
+    return;
+  }
+
+  if ( $code == $CODE_GNATS_LOCKED ) {
+    carp('Cannot delete, Gnats DB is currently locked.');
+    return;
+  }
+
+  if ( $code == $CODE_NONEXISTENT_PR ) {
+    carp('PR nonexistent.');
+    return;
+  }
+
+  carp('Unexpected error [' . $code . '] occurred. PR not deleted.');
+  return;
 }
 
 sub check_newpr {
@@ -556,7 +643,7 @@ sub check_pr {
   my ($code, $response) = $self->_do_gnats_cmd("CHEK $argument");
 
   if ($self->_is_code_ok($code)) {
-    ($code, $response) = $self->_do_gnats_cmd( $pr . $NL);
+    ($code, $response) = $self->_do_gnats_cmd( $pr . $NL . $DOT );
     if ($self->_is_code_ok($code)) {
       return 1;
     }
@@ -695,37 +782,34 @@ sub append_field_content {
 }
 
 sub submit_pr {
-    my ( $self, $pr ) = @_;
+  my ( $self, $pr ) = @_;
 
-    if ($self->{newPRs} > $MAX_NEW_PRS) {
-      $self->restart('Too Many New PRs');
-    }
+  if ($self->{newPRs} > $MAX_NEW_PRS) {
+    $self->restart('Too Many New PRs');
+  }
 
-    my $pr_string = $pr->unparse();
+  my $pr_string = $pr->unparse();
 
-    my ($code, $response) = $self->_do_gnats_cmd('SUBM');
+  my ($code, $response) = $self->_do_gnats_cmd('SUBM');
 
-    if ($self->_is_code_ok($code)) {
-        ($code, $response) = $self->_do_gnats_cmd($pr_string . $NL . q{.});
+  if ($code == $CODE_GNATS_LOCKED) {
+    carp( 'Gnats database locked, cannot submit PR.' );
+    return;
+  }
 
-        debug("Gnats::submitPR: code=$code response=$response");
-        if ($self->_is_code_ok($code)) {
-          $self->{newPRs}++;
-          return $response;
-        } else {
-          $self->_mark_error($code, $response);
-        }
-    } else {
-        $self->_mark_error($code, $response);
-    }
+  ($code, $response) = $self->_do_gnats_cmd($pr_string . $NL . q{.});
 
-    if ( $code == $CODE_FILE_ERROR ) {
-      if ($self->restart($code)) {
-        # TODO: This can potentially be an infinite loop...
-        return $self->submit_pr($pr);
-      }
-    }
-    return 0;
+  # Returns PR Number. Return this to the caller.
+  if ( $code == $CODE_INFORMATION or
+       $code == $CODE_INFORMATION_FILLER ) {
+    $self->{newPRs}++;
+    return $response;
+  }
+
+  # Something unexpected happened.  The client can attempt to resend.
+  # Later, give the client the whole response object.
+  carp('ERROR: Unexpected response code [' . $code . ']: ' . @{ $response }[0]);
+  return;
 }
 
 ##################################################################
@@ -737,18 +821,17 @@ sub submit_pr {
 sub update_pr {
   my ( $self, $pr ) = @_;
 
-  my $user         = $self->{user};
-  my $prnum        = $pr->getField('Number');
   my $last_modified = $pr->getField('Last-Modified');
   $last_modified ||= q{}; # Default to empty
 
   my $pr_string = $pr->unparse('gnatsd');
 
   my $code; my $response ; my $st = 0;
+
   # Lock the PR so we can edit it.
   # Locking it returns the PR contents which we use to see what has changed.
-
-  my $spr = $self->lock_pr($prnum, $user);
+  my $spr = $self->lock_pr($pr->getField('Number'),
+                           $self->{user});
 
   return $st if not defined $spr;
 
@@ -761,28 +844,42 @@ sub update_pr {
   $slast_modified ||= q{}; # Default to empty
 
   if ($last_modified ne $slast_modified) {
-    $code = '433'; # What code to return?  433=PR_NOT_LOCKED
-    $response = "433 Sorry can't edit $prnum, it has been modified by someone else";
-  } else {
-    ($code, $response) = $self->_do_gnats_cmd("EDITADDR $user");
-    if ($self->_is_code_ok($code)) {
-      ($code, $response) = $self->_do_gnats_cmd("EDIT $prnum");
-      if ($self->_is_code_ok($code)) {
-        ($code, $response) = $self->_do_gnats_cmd( $pr_string . q{.} );
-        if ($self->_is_code_ok($code)) {
-          $st = 1; # Everything worked!
-        }
-      }
-    }
+    carp('Someone modified the PR. Refresh the PR and try again.');
+    return;
   }
-  # TODO: Detect unlock PR problems?
-  # Seems that unlock sometimes returns a 6xx code even if the lock file is removed?
-  $self->unlock_pr($prnum);
-  if (not $st) {
-    # Something above failed, mark the error.
-    $self->_mark_error($code, $response);
+
+  ($code, $response) = $self->_do_gnats_cmd('EDITADDR ' . $self->{user});
+  if ( $code == $CODE_CMD_ERROR ) {
+    carp('ERROR: EDITADDR: ' . $response);
+    return;
   }
-  return;
+
+  ($code, $response) = $self->_do_gnats_cmd('EDIT ' . $pr->getField('Number'));
+
+  if ( $code == $CODE_GNATS_LOCKED ) {
+    carp('ERROR: EDIT: CODE_GNATS_LOCKED: ' . $response);
+    return;
+  }
+  if ( $code == $CODE_PR_NOT_LOCKED ) {
+    carp('ERROR: EDIT: CODE_PR_NOT_LOCKED: ' . $response);
+    return;
+  }
+  if ( $code == $CODE_NONEXISTENT_PR ) {
+    carp('ERROR: EDIT: CODE_NONEXISTENT_PR: ' . $response);
+    return;
+  }
+  # Assume CODE_SEND_PR response at this point.
+
+  ($code, $response) = $self->_do_gnats_cmd( $pr_string . q{.} );
+
+  if ( $code != $CODE_OK ) {
+    carp('ERROR: EDIT: FILING FAILED: ' . $response);
+    return;
+  }
+
+  $self->unlock_pr($pr->getField('Number'));
+
+  return 1;
 }
 
 
@@ -802,34 +899,36 @@ sub fillout_pr {
 }
 
 sub get_pr_by_number {
-    my ( $self, $num ) = @_;
+  my ( $self, $num ) = @_;
 
-    my ($code, $response) = $self->_do_gnats_cmd('RSET');
-    if (not $self->_is_code_ok($code)) {
-        $self->_mark_error($code, $response);
-        return;
-    }
+  if ( not defined $self->reset_server ) {
+    return;
+  }
 
-    ($code, $response) = $self->_do_gnats_cmd('QFMT full');
-    if (not $self->_is_code_ok($code)) {
-        $self->_mark_error($code, $response);
-        return;
-    }
+  my ($code, $response) = $self->_do_gnats_cmd('QFMT full');
+  if (not $self->_is_code_ok($code)) {
+    $self->_mark_error($code, $response);
+    return;
+  }
 
-    ($code, $response) = $self->_do_gnats_cmd("QUER $num");
+  ($code, $response) = $self->_do_gnats_cmd("QUER $num");
 
-    if ( $code == $CODE_NO_PRS_MATCHED and
-         @{$response}[0] eq 'No PRs match.' ) { return; }
+  debug('CODE: ' . $code );
+  debug('RESPONSE: ' . @{ $response }[0] );
+  if ( $code == $CODE_NO_PRS_MATCHED and
+       @{$response}[0] eq 'No PRs match.' ) {
+    return;
+  }
 
-    if (not $self->_is_code_ok($code)) {
-        $self->_mark_error($code, $response);
-        return;
-    }
+  if (not $self->_is_code_ok($code)) {
+    $self->_mark_error($code, $response);
+    return;
+  }
 
-    my $pr = $self->new_pr();
-    $pr->parse( @{ $response } ) ;
+  my $pr = $self->new_pr();
+  $pr->parse( @{ $response } ) ;
 
-    return $pr;
+  return $pr;
 }
 
 
@@ -845,38 +944,36 @@ sub expr {
 }
 
 sub query {
-    my ( $self ) = @_;
-    my @exprs = @_;
+  my ( $self ) = @_;
+  my @exprs = @_;
 
-    my ($code, $response) = $self->_do_gnats_cmd('RSET'); #XXX TODO
+  if ( not defined $self->reset_server ) {
+    return;
+  }
+
+  my ($code, $response) = $self->_do_gnats_cmd('QFMT Number'); #XXX TODO
+  if (not $self->_is_code_ok($code)) {
+    $self->_mark_error($code, $response);
+    return;
+  }
+
+  foreach my $expr (@exprs) {
+    ($code, $response) = $self->_do_gnats_cmd("EXPR $expr");
     if (not $self->_is_code_ok($code)) {
-        $self->_mark_error($code, $response);
-        return;
+      $self->_mark_error($code, $response);
+      return;
     }
+  }
 
-    ($code, $response) = $self->_do_gnats_cmd('QFMT Number'); #XXX TODO
-    if (not $self->_is_code_ok($code)) {
-        $self->_mark_error($code, $response);
-        return;
-    }
-
-    foreach my $expr (@exprs) {
-        ($code, $response) = $self->_do_gnats_cmd("EXPR $expr");
-        if (not $self->_is_code_ok($code)) {
-            $self->_mark_error($code, $response);
-            return;
-        }
-    }
-
-    my @nums;
-    ($code, $response) = $self->_do_gnats_cmd('QUER');
-    if ($self->_is_code_ok($code)) {
-        @nums = $self->_extract_list_content($response);
-    } else {
-        $self->_mark_error($code, $response);
-        return;
-    }
-    return @nums;
+  my @nums;
+  ($code, $response) = $self->_do_gnats_cmd('QUER');
+  if ($self->_is_code_ok($code)) {
+    @nums = $self->_extract_list_content($response);
+  } else {
+    $self->_mark_error($code, $response);
+    return;
+  }
+  return @nums;
 }
 
 sub _list {
@@ -972,9 +1069,9 @@ sub _process {
 
   my $r = $self->_get_gnatsd_response;
 
-  if ($r->code == $CODE_INVALID_ENUM) {
-    while ( $self->_gsock->getlines ) { debug( $_ ) ; }
-  }
+#  if ($r->code == $CODE_INVALID_ENUM) {
+#    while ( $self->_gsock->getline ) { debug( $_ ) ; }
+#  }
 
   $self->{lastCode} = $r->code;
   $self->{lastResponse} = $r->raw;
@@ -1013,6 +1110,8 @@ sub _read {
 
   my $line = $self->_gsock->getline;
 
+  if ( not defined $line ) { return; }
+
   $line = $self->_read_clean($line);
 
   debug('READ: [' . __LINE__ . '][' . $line . ']');
@@ -1021,7 +1120,7 @@ sub _read {
 
   $response->code( @{ $result }[0] );
 
-  if (not defined $response->code) { return; }
+  if ( not defined $response->code ) { return; }
 
   if ( not ( $response->code == $CODE_PR_READY           or
              $response->code == $CODE_TEXT_READY         or
@@ -1029,10 +1128,16 @@ sub _read {
     push @{ $raw }, @{$result}[2];
   }
 
+#  if ( defined ( my $next = $self->_read ) ) {
+#    push @{ $raw }, $next->raw;
+#  }
+
   if ( $self->_read_has_more( $result ) ) {
     push @{ $raw } , @{ $self->_read_multi };
   }
+
   $response->raw( $raw );
+
   return $response;
 }
 
@@ -1106,7 +1211,9 @@ sub _mark_error {
 sub debug {
   my ( $message ) = @_;
   if ( not defined $debug_gnatsd) { return; }
-  carp( 'DEBUG: [' . $message . ']' . $NL );
+  if ( not ( print 'DEBUG: [' . $message . ']' . $NL ) ) {
+    carp ( 'weird - could not print trace string' );
+  }
   return;
 }
 
@@ -1126,7 +1233,7 @@ Net::Gnats - Perl interface to GNU Gnats daemon
 
 =head1 VERSION
 
-0.7
+0.11
 
 =head1 SYNOPSIS
 

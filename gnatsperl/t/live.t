@@ -7,7 +7,7 @@ unless ( $ENV{'GNATS_MAINTAINER'} ) {
   plan skip_all => "Live tests by default are skipped, maintainer only.";
 }
 else {
-  plan tests => 22;
+  plan tests => 29;
 }
 
 use Net::Gnats;
@@ -72,6 +72,11 @@ $pr1->setField('Synopsis','Some bug from perlgnats');
   # $newPR->setField("How-To-Repeat","Like this.  Like this.");
   # $newPR->setField("Fix","Who knows");
 
+is($g->validate_field('BADFIELD', 'noop'), undef, 'VFLD fail');
+is($g->validate_field('Priority', 'BAD'), undef, 'VFLD Value fail');
+is($g->validate_field('Priority', 'low'), 1, 'VFLD Value pass');
+
+
 my $pr1_result = join "\n", @{ $g->submit_pr($pr1) };
 ok($pr1_result > 0, 'we have a pr');
 
@@ -89,6 +94,18 @@ $g->unlockMainDatabase;
 my $pr3 = $g->get_pr_by_number('99999999');
 is($pr3, undef, 'undefined pr deserves an undef');
 
+# you can delete only closed PRs
+ok($pr2->setField('State', 'closed', 'close for testing'));
+
+# give things a chance to index.
+print "SLEEPING 20 SECONDS FOR INDEXING PRIOR TO UPDATE AND DELETE\n";
+sleep 20;
+
+ok($g->update_pr($pr2));
+
+is($g->delete_pr($pr2), 1, 'can delete prs');
+
+is($g->delete_pr($pr2), undef, 'cannot delete a deleted pr');
 
 ok($g->disconnect, 'Logout of gnats');
 

@@ -11,7 +11,7 @@ require Exporter;
 use AutoLoader qw(AUTOLOAD);
 
 our @ISA = qw(Exporter);
-our $VERSION = '0.08';
+our $VERSION = '0.11';
 
 # Items to export into callers namespace by default. Note: do not
 # export names by default without a very good reason. Use EXPORT_OK
@@ -79,7 +79,7 @@ sub getKeys {
 }
 
 sub asHash {
-    my $self = shift;
+    my ( $self ) = shift;
     return %{$self->{fields}} if defined($self->{fields}); #XXX Deep copy?
     return undef;
 }
