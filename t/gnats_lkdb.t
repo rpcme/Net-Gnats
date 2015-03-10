@@ -5,7 +5,7 @@ use Test::MockObject;
 use Test::MockObject::Extends;
 use Net::Gnats;
 
-plan tests => 5;
+plan tests => 7;
 
 my $module = Test::MockObject::Extends->new('IO::Socket::INET');
 $module->fake_new( 'IO::Socket::INET' );
@@ -19,7 +19,8 @@ $module->set_series( 'getline',
                      "431 CODE_GNATS_LOCKED\r\n",
                    );
 
-my $g = Net::Gnats->new();
+isa_ok my $g = Net::Gnats->new(), 'Net::Gnats';
+
 is $g->gnatsd_connect, 1;
 is $g->lock_main_database, 1,     '200 locked';
 is $g->lock_main_database, undef, 'ERROR 600 Can lock database';

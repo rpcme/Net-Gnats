@@ -277,8 +277,9 @@ sub gnatsd_connect {
     }
 
     # Grab the gnatsd version
-    if ( $response->raw =~ /\d.\d.\d/ ) {
-      $self->{gnatsdVersion} = $response->raw;
+    my $gversion = pop @{ $response->raw };
+    if ( $gversion =~ /\d.\d.\d/ ) {
+      $self->{gnatsdVersion} = $gversion;
       $self->{gnatsdVersion} =~ s/.*(\d.\d.\d).*/$1/g;
     }
     else {
@@ -303,11 +304,8 @@ sub get_dbnames {
     my ($code, $response) = $self->_do_gnats_cmd('DBLS');
     debug('DBLS CODE: [' . $code . ']');
 
-    if ($self->_is_code_ok($code)) {
-        return $self->_extract_list_content($response);
-    }
+    return $response if $code == $CODE_OK;
 
-    debug('DBLS DID NOT PASS IS_CODE_OK');
     $self->_mark_error($code, $response);
     return;
 }
@@ -343,20 +341,22 @@ sub list_states {
 sub list_fieldnames {
   my ( $self ) = @_;
   my ($code, $response) = $self->_do_gnats_cmd('LIST FIELDNAMES');
-  return if not $self->_is_code_ok($code);
-  return $response;
+  return $response if $code == $CODE_TEXT_READY;
+  return;
 }
 
 sub list_inputfields_initial {
   my ( $self ) = @_;
+
   if ($#{$self->{fieldData}->{initial}} < 0) {
     my ($code, $response) = $self->_do_gnats_cmd('LIST INITIALINPUTFIELDS');
-    if ($self->_is_code_ok($code)) {
-      push @{$self->{fieldData}->{initial}}, $self->_extract_list_content($response);
-    } else {
+
+    if ($code != $CODE_OK) {
       $self->_mark_error($code, $response);
       return;
     }
+
+    push @{$self->{fieldData}->{initial}}, $response;
   }
   return wantarray ? @{$self->{fieldData}->{initial}} : $self->{fieldData}->{initial};
 }
@@ -445,27 +445,29 @@ sub get_field_flags {
 sub get_field_validators {
     my ( $self, $field ) = @_;
 
+    return if not defined $field;
+
     my ($code, $response) = $self->_do_gnats_cmd("FVLD $field");
 
-    if ($self->_is_code_ok($code)) {
-        my @validators = $self->_extract_list_content($response);
-        return @validators;
-    } else {
-        $self->_mark_error($code, $response);
-        return;
+    return $response if $code == $CODE_TEXT_READY;
+
+    if ( $code == $CODE_INVALID_FIELD_NAME ) {
+      $self->_mark_error($code, $response);
+      return;
     }
+
+    return;
 }
 
 
 sub validate_field {
   my ( $self, $field, $input ) = @_;
 
+  return if not defined $field or not defined $input;
+
   my ($code, $response) = $self->_do_gnats_cmd("VFLD $field");
 
-  if ( $code != $CODE_SEND_TEXT ) { # MUST respond with 212 to continue.
-    logerror('ERROR: [' . $code . '] when calling VFLD on [' . $field . ']');
-    return;
-  }
+  return if $code != $CODE_SEND_TEXT;
 
   ($code, $response) = $self->_do_gnats_cmd($input . $NL . q{.});
 
@@ -556,6 +558,8 @@ sub unlock_main_database {
 sub lock_pr {
   my ( $self, $pr_number, $user ) = @_;
 
+  return if not defined $pr_number or not defined $user;
+
   my ($code, $response) = $self->_do_gnats_cmd("LOCK $pr_number $user");
 
   if ( $code == $CODE_CMD_ERROR ) {
@@ -595,6 +599,8 @@ sub unlock_pr {
 
   my ($code, $response) = $self->_do_gnats_cmd( 'UNLK ' . $pr );
 
+  return 1 if $code == $CODE_OK;
+
   if ( $code == $CODE_CMD_ERROR ) {
     logerror( 'ERROR: CODE_CMD_ERROR: ' . $response );
     return;
@@ -616,8 +622,8 @@ sub unlock_pr {
     return;
   }
 
-  # CODE_OK
-  return 1;
+  #garbage
+  return;
 }
 
 sub delete_pr {
@@ -727,9 +733,9 @@ sub set_workingemail {
 
 sub truncate_field_content {
   my ( $self, $pr, $field, $input, $reason ) = @_;
-  confess '? Error: pr not passed to replaceField' if not defined $pr;
-  confess '? Error: field passed to replaceField' if not defined $field;
-  confess '? Error: no input passed to replaceField' if not defined $input;
+  logerror('? Error: pr not passed to replaceField') if not defined $pr;
+  logerror('? Error: field passed to replaceField') if not defined $field;
+  logerror('? Error: no input passed to replaceField') if not defined $input;
 
   # See if this field requires a change reason.
   # TODO: We could just enter the $input, and see if gnatsd says
@@ -797,9 +803,9 @@ sub restart {
 sub append_field_content {
     my ( $self, $pr, $field, $input ) = @_;
 
-    confess '? Error: pr not passed to appendField' if not defined $pr;
-    confess '? Error: field passed to appendField' if not defined $field;
-    confess '? Error: no input passed to appendField' if not defined $input;
+    logerror('? Error: pr not passed to appendField') if not defined $pr;
+    logerror('? Error: field passed to appendField') if not defined $field;
+    logerror('? Error: no input passed to appendField') if not defined $input;
 
     my ($code, $response) = $self->_do_gnats_cmd("APPN $pr $field");
 
@@ -924,17 +930,14 @@ sub update_pr {
 
 sub new_pr {
   my ( $self ) = @_;
-  return Net::Gnats::PR->new($self);
-}
 
-# Fillout all defaults for a PR.
-# TODO: should this always be called by newPR?
-sub fillout_pr {
-  my ( $self, $pr ) = @_;
+  my $pr = Net::Gnats::PR->new($self);
+
   foreach my $field ($self->listInitialInputFields) {
-    $pr->setField($field,$self->getFieldDefault($field));
+    $pr->setField($field,
+                  $self->getFieldDefault( $field ) );
   }
-  return;
+  return $pr;
 }
 
 sub get_pr_by_number {
@@ -972,47 +975,49 @@ sub get_pr_by_number {
 
 
 sub expr {
-    my ( $self ) = @_;
-    my @exprs = @_;
+  my $self = shift;
+  my @exprs = @_;
+  return if scalar @exprs == 0;
 
-    my ($code, $response);
-    foreach my $expr (@exprs) {
-        ($code, $response) = $self->_do_gnats_cmd("EXPR $expr");
-    }
-    return $code; #XXX TODO and codes together or abort or something
+  my ($code, $response);
+  foreach my $expr (@exprs) {
+    ($code, $response) = $self->_do_gnats_cmd("EXPR $expr");
+    return if $code == $CODE_INVALID_EXPR;
+  }
+  return 1;
+}
+
+# Because we don't know what's in the dbconfig file, we will only
+# support FULL, STANDARD, and SUMMARY since those must be defined.
+# Otherwise, we assume it is a custom format.
+sub qfmt {
+  my ($self, $format) = @_;
+
+  # If format is not defined, then defaults to STANDARD
+  # This is per the GNATS specification.
+  $format = 'standard' if not defined $format;
+
+  my ($code, $response) = $self->_do_gnats_cmd("QFMT $format");
+
+  return 1 if $code == $CODE_OK;
+  return   if $code == $CODE_CMD_ERROR;
+  return   if $code == $CODE_INVALID_QUERY_FORMAT;
+  return;
 }
 
 sub query {
-  my ( $self ) = @_;
+  my $self = shift;
   my @exprs = @_;
 
-  if ( not defined $self->reset_server ) {
-    return;
-  }
+  return if not defined $self->reset_server;
+  return if not defined $self->qfmt('full');
+  return if not defined $self->expr(@exprs);
 
-  my ($code, $response) = $self->_do_gnats_cmd('QFMT Number'); #XXX TODO
-  if (not $self->_is_code_ok($code)) {
-    $self->_mark_error($code, $response);
-    return;
-  }
-
-  foreach my $expr (@exprs) {
-    ($code, $response) = $self->_do_gnats_cmd("EXPR $expr");
-    if (not $self->_is_code_ok($code)) {
-      $self->_mark_error($code, $response);
-      return;
-    }
-  }
-
-  my @nums;
-  ($code, $response) = $self->_do_gnats_cmd('QUER');
-  if ($self->_is_code_ok($code)) {
-    @nums = $self->_extract_list_content($response);
-  } else {
-    $self->_mark_error($code, $response);
-    return;
-  }
-  return @nums;
+  my ($code, $response) = $self->_do_gnats_cmd('QUER');
+  return $response if $code == $CODE_PR_READY;
+  return []        if $code == $CODE_NO_PRS_MATCHED;
+  return           if $code == $CODE_INVALID_QUERY_FORMAT;
+  return;
 }
 
 sub _list {
@@ -1066,6 +1071,30 @@ sub login {
   return;
 }
 
+# Specify the user for database access.
+# A 350 is not returned in this case.
+sub cmd_user {
+  my ( $self, $user, $pass) = @_;
+
+  return if not defined $user or not defined $pass;
+
+  my ( $code, $response ) = $self->_do_gnats_cmd("USER $user $pass");
+
+  if ( $code == $CODE_OK ) {
+    $self->_set_access_mode;
+    return 1;
+  }
+
+  if ( $code == $CODE_NO_ACCESS ) {
+    logerror( 'ERROR: CODE_NO_ACCESS: ' . $response );
+    return
+  }
+
+  logerror( 'ERROR: LOGIN: UNKNOWN RESPONSE: ' . $response );
+  return;
+}
+
+
 sub get_access_mode {
     my ( $self ) = @_;
     return $self->{accessMode};
@@ -1074,18 +1103,20 @@ sub get_access_mode {
 # This is called by login to determine the current access mode,
 # typically this would not be called by the user.
 sub _set_access_mode {
-    my ( $self )  = @_;
+  my ( $self )  = @_;
 
-    $self->{accessMode} = undef; # Clear it.
-    my ($code, $response) = $self->_do_gnats_cmd('USER');
-    if ($self->_is_code_ok($code)) {
-        $response =~ s/.*\n350\s*(\S+)\s*\n/$1/gsm;
-        $self->{accessMode} = $response;
-        return $response;
-    } else {
-        $self->_mark_error($code, $response);
-        return 0;
-    }
+  $self->{accessMode} = undef;
+
+  my ($code, $response) = $self->_do_gnats_cmd('USER');
+
+  if ($self->_is_code_ok($code)) {
+    $response =~ s/.*\n350\s*(\S+)\s*\n/$1/gsm;
+    $self->{accessMode} = $response;
+    return $response;
+  }
+
+  $self->_mark_error($code, $response);
+  return 0;
 }
 
 

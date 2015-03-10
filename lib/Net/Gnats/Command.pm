@@ -21,10 +21,10 @@ use warnings;
 # login was successful.
 
 sub user {
-  my ( $c, $uid, $pwd ) = @_;
+  my ( $self, $uid, $pwd ) = @_;
   my $c = 'USER';
 
-  $c->send_cmd( $c . $SPC . $uid . $SPC . $pwd );
+  $self->send_cmd( $c . $SPC . $uid . $SPC . $pwd );
   is_error($r->code) and log_error($r) and return;
   return $r;
 }
@@ -467,7 +467,7 @@ After the CHEK command is issued, the server will respond with either a 440 (COD
 
 Once the 211 response is received from the server, the client should send the PR using the normal PR quoting mechanism; the final line of the PR is then followed by a line containing a single period, as usual.
 
-The server will then respond with either a 200 (CODE_OK) response, indicating there were no problems with the supplied text, or one or more error codes listing the problems with the PR. 
+The server will then respond with either a 200 (CODE_OK) response, indicating there were no problems with the supplied text, or one or more error codes listing the problems with the PR.
 
 sub chek {
 }
@@ -476,17 +476,17 @@ EDIT PR
 Verifies the replacement text for PR. If the command is successful, the contents of PR are completely replaced with the supplied text. The PR must previously have been locked with the LOCK command.
 The possible responses are:
 
-431 (CODE_GNATS_LOCKED) 
+431 (CODE_GNATS_LOCKED)
 The database has been locked, and no PRs may be updated until the lock is cleared.
 
-433 (CODE_PR_NOT_LOCKED) 
+433 (CODE_PR_NOT_LOCKED)
 The PR was not previously locked with the LOCK command.
 
-400 (CODE_NONEXISTENT_PR) 
+400 (CODE_NONEXISTENT_PR)
 The specified PR does not currently exist. The SUBM command should be used to create new PRs.
 
-211 (CODE_SEND_PR) 
-The client should now transmit the replacement PR text using the normal PR quoting mechanism. After the PR has been sent, the server will respond with either 200 (CODE_OK) indicating that the edit was successful, or one or more error codes listing problems either with the replacement PR text or errors encountered while updating the PR file or index. 
+211 (CODE_SEND_PR)
+The client should now transmit the replacement PR text using the normal PR quoting mechanism. After the PR has been sent, the server will respond with either 200 (CODE_OK) indicating that the edit was successful, or one or more error codes listing problems either with the replacement PR text or errors encountered while updating the PR file or index.
 
 sub edit_pr {
 }
@@ -495,11 +495,11 @@ EDITADDR address
 Sets the e-mail address of the person communicating with gnatsd. The command requires at least the edit access level.
 The possible responses are:
 
-200 (CODE_OK) 
+200 (CODE_OK)
 The address was successfully set.
 
-440 (CODE_CMD_ERROR) 
-Invalid number of arguments were supplied. 
+440 (CODE_CMD_ERROR)
+Invalid number of arguments were supplied.
 
 sub editaddr {
 }

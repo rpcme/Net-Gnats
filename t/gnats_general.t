@@ -8,16 +8,18 @@ use Net::Gnats;
 my $module = Test::MockObject::Extends->new('IO::Socket::INET');
 $module->fake_new( 'IO::Socket::INET' );
 $module->set_true( 'print' );
-$module->set_true( 'close' );
 $module->set_series( 'getline',
                      "200 my.gnatsd.com GNATS server 4.1.0 ready.\r\n",
-                     "201 CODE_CLOSING\r\n"
+                     "200 CODE_OK\r\n",
+                     "600 CODE_CMD_ERROR\r\n",
+                     "GARBAGE faibfiaog7abviibovibusvidbu\r\n",
+                     "440 CODE_CMD_ERROR\r\n",
+                     "431 CODE_GNATS_LOCKED\r\n",
                    );
+isa_ok my $g = Net::Gnats->new, 'Net::Gnats';
 
-my $g = Net::Gnats->new();
-$g->gnatsd_connect;
+is $g->gnatsd_connect, 1;
 
-# According to the GNATS documentation, this command "can never fail"
-is $g->disconnect, 1, '201 CODE_CLOSING';
+isa_ok $g->new_pr, 'Net::Gnats::PR';
 
 done_testing();
