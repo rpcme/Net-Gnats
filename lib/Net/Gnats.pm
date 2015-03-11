@@ -324,8 +324,8 @@ sub list_categories {
 
 sub list_submitters {
     return shift->_list('SUBMITTERS',
-                        ['name', 'desc', 'contract', 'something1',
-                         'responsible']);
+                        ['name', 'desc', 'contract', 'response',
+                         'contact', 'othernotify']);
 }
 
 sub list_responsible {
@@ -351,7 +351,7 @@ sub list_inputfields_initial {
   if ($#{$self->{fieldData}->{initial}} < 0) {
     my ($code, $response) = $self->_do_gnats_cmd('LIST INITIALINPUTFIELDS');
 
-    if ($code != $CODE_OK) {
+    if ($code != $CODE_TEXT_READY) {
       $self->_mark_error($code, $response);
       return;
     }
@@ -687,30 +687,20 @@ sub check_pr {
 
   my ($code, $response) = $self->_do_gnats_cmd("CHEK $argument");
 
-  if ($self->_is_code_ok($code)) {
-    ($code, $response) = $self->_do_gnats_cmd( $pr . $NL . $DOT );
-    if ($self->_is_code_ok($code)) {
-      return 1;
-    }
-    # TODO: Should this be handled in _doGnatsCmd?
-    # If gnatsd returns a: 401 Couldn't read PR header
-    # or if it sends multiple: 411 There is a bad value ... for field ...
-    # then it also sends a: 403 Errors found checking PR text
-    # So read back that response, but ignore it cause the user
-    # would want to see the 401 error
-    my @response = split $NL, $response;
+  return if $code != $CODE_SEND_PR;
 
-    # TODO This condition is moderately retarded
-    if (   $code == $CODE_INVALID_ENUM or
-         ( $code == $CODE_INVALID_ENUM and $#response > 0)) {
-      my ($rcode, $rresponse) = $self->_process;
-    }
-    $self->_mark_error($code, $response);
-    return 0;
+  ($code, $response) = $self->_do_gnats_cmd( $pr . $NL . $DOT );
+
+  return 1 if $code == $CODE_OK;
+
+  my @findings = split $NL, $response;
+
+  if (   $code == $CODE_INVALID_ENUM or
+         ( $code == $CODE_INVALID_ENUM and $#findings > 0)) {
+    my ($rcode, $rresponse) = $self->_process;
   }
 
-  $self->_mark_error($code, $response);
-  return 0;
+  return;
 }
 
 
@@ -1030,14 +1020,13 @@ sub _list {
     return;
   }
 
-  my @result = qw();
-
-  my @rawrows = $self->_extract_list_content($response);
-  foreach my $row (@rawrows) {
-    push @result, map { @{ $keynames }[$_] =>
-                          $rawrows[$_] } 0..( scalar @{$keynames} - 1);
+  my $result = [];
+  foreach my $row (@{ $response }) {
+    my @parts = split ':', $row;
+    push @{ $result}, { map { @{ $keynames }[$_] =>
+                                $parts[$_] } 0..( scalar @{$keynames} - 1) };
   }
-  return \@result;
+  return $result;
 }
 
 sub login {
