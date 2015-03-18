@@ -16,6 +16,7 @@ sub new {
   my $code = defined $param->{code} ? $param->{code} : -1;
   $self->raw( $raw );
   $self->code( $code );
+  $self->{inner_responses} = [];
   return $self;
 }
 
@@ -36,6 +37,19 @@ sub code {
     $self->{code} = $value;
   }
   return $self->{code};
+}
+
+# see perldoc for documentation
+sub inner_responses {
+  my ($self, $value) = @_;
+
+  if (defined $value) {
+    if ( ref $value ne 'Net::Gnats::Response' ) {
+      return $self->{inner_responses}
+    }
+    push @{ $self->{inner_responses} }, $value;
+  }
+  return $self->{inner_responses};
 }
 
 # see perldoc for documentation
