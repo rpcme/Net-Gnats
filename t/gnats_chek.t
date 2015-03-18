@@ -65,8 +65,8 @@ sub pr3 {
 To: bugs
 CC:
 Subject: Your product sucks
-From: rich@richelberger.com
-Reply-To: rich@richelberger.com
+From: rich\@richelberger.com
+Reply-To: rich\@richelberger.com
 X-Send-Pr-Version: Net::Gnats-5
 
 >Number: 1
