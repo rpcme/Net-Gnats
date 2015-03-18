@@ -358,7 +358,7 @@ sub list_inputfields_initial {
 
     push @{$self->{fieldData}->{initial}}, @{$r->raw};
   }
-  return wantarray ? @{$self->{fieldData}->{initial}} : $self->{fieldData}->{initial};
+  return $self->{fieldData}->{initial};
 }
 
 sub list_inputfields_initial_required {
