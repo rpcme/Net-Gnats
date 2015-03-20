@@ -8,6 +8,6 @@ WriteMakefile(
   'ABSTRACT'           => 'Interface to GNU Gnats Daemon',
               'MIN_PERL_VERSION'   => '5.010_000',
               PREREQ_FATAL => 1,
-  'PREREQ_PM'          => { 'Readonly' => '1.61' },
-  'TEST_REQUIRES'      => { 'Test::MockObject' => '1.20140408' },
+  'PREREQ_PM'          => { 'Readonly' => 0 },
+  'TEST_REQUIRES'      => { 'Test::MockObject' => 0 },
 );
