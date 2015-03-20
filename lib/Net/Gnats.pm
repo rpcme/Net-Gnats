@@ -202,14 +202,43 @@ sub new {
     $self->{errorMessage} = undef;
     $self->{accessMode} = undef;
     $self->{gnatsdVersion} = undef;
+    $self->{skip_version_check} = 0;
     $self->{user} = undef;
     $self->{db}   = undef;
 
     return $self;
 }
 
+sub gnatsd_version {
+  my ($self, $value) = @_;
+  if (defined $value) {
+    $value =~ s/.*(\d+.\d+.\d+).*/$1/;
+    $self->{gnatsdVersion} = $1;
+  }
+  return $self->{gnatsdVersion};
+}
+
+# "legally" use v4 daemon only
+sub check_gnatsd_version {
+  my ($self) = @_;
+  my $rmajor = 4;
+  my $min_minor = 1;
+  return 1 if $self->skip_version_check;
+  my ($majorv, $minorv, $patchv) = split /\./, $self->gnatsd_version;
+
+  return 0 if $majorv != $rmajor;
+  return 0 if $minorv < $min_minor;
+  return 1;
+}
+
+sub skip_version_check {
+  my ($self, $value) = @_;
+  $self->{skip_version_check} = $value if defined $value;
+  return $self->{skip_version_check};
+}
+
 sub debug_gnatsd {
-  $debug_gnatsd = 1;
+  $debug_gnatsd = 0;
   return;
 }
 
@@ -225,9 +254,7 @@ sub gnatsd_connect {
     my ( $self ) = @_;
     my ( $sock, $iaddr, $paddr, $proto );
 
-    if ( defined $self->_gsock ) {
-      $self->disconnect;
-    }
+    $self->disconnect if defined $self->_gsock;
 
     my $socket = IO::Socket::INET->new( PeerAddr => $self->{ hostAddr },
                                         PeerPort => $self->{ hostPort },
@@ -240,30 +267,6 @@ sub gnatsd_connect {
 
     $self->_gsock( $socket );
 
-
-    #TODO disconnect if already connected
-
-#    if ( ! ( $iaddr = inet_aton($self->{hostAddr} ) ) ) {
-#        carp("Unknown GNATS host '$self->{hostAddr}'");
-#        return 0;
-#    }
-
-#    $paddr = sockaddr_in( $self->{ hostPort }, $iaddr);
-#    $proto = getprotobyname 'tcp' ;
-#    if ( not socket $sock, PF_INET, SOCK_STREAM, $proto ) {
-      #TODO: RECOVER BETTER HERE
-#      carp "gnatsweb: client_init error $self->{hostAddr} $self->{hostPort}: $OS_ERROR";
-#      return 0;
-#    }
-
-
-#    if ( not connect $self->_gsock, $paddr ) {
-      #TODO: RECOVER BETTER HERE
-#      carp "gnatsweb: client_init error $self->{hostAddr} $self->{hostPort}: $OS_ERROR ;";
-#      return 0;
-#    }
-
-#    $self->_gsock->autoflush(1);
     my $response = $self->_get_gnatsd_response();
 
     $self->{lastCode} = defined $response->code ? $response->code : undef;
@@ -272,21 +275,18 @@ sub gnatsd_connect {
 
     # Make sure we got a 200 code.
     if ($response->code != $CODE_GREETING) {
-      logerror("Unknown gnatsd connection response: $response");
+      logerror("Unknown gnatsd connection response: " . $response->as_string);
       return 0;
     }
 
     # Grab the gnatsd version
-    my $gversion = pop @{ $response->raw };
-    if ( $gversion =~ /\d.\d.\d/ ) {
-      $self->{gnatsdVersion} = $gversion;
-      $self->{gnatsdVersion} =~ s/.*(\d.\d.\d).*/$1/g;
-    }
-    else {
+    $self->gnatsd_version( pop @{ $response->raw } );
+    if (not $self->check_gnatsd_version) {
       # We only know how to talk to gnats4
       warn "? Error: GNATS Daemon version $self->{gnatsdVersion} at $self->{hostAddr} $self->{hostPort} is not supported by Net::Gnats\n";
       return 0;
     }
+
     $self->{newPRs} = 0;
     return 1;
 }
@@ -295,6 +295,7 @@ sub disconnect {
     my ( $self ) = @_;
     $self->_do_gnats_cmd('QUIT');
     $self->{sock}->close;
+    $self->{sock} = undef;
     return 1;
 }
 
@@ -1247,7 +1248,8 @@ sub _mark_error {
 
 sub debug {
   my ( $message ) = @_;
-  if ( not defined $debug_gnatsd) { return; }
+  if ( not defined $debug_gnatsd or
+       not $debug_gnatsd) { return; }
   if ( not ( print 'DEBUG: [' . $message . ']' . $NL ) ) {
     logerror ( 'weird - could not print trace string' );
   }
@@ -1449,6 +1451,15 @@ the get_error_code() and get_error_message() methods.
 Constructor, optionally taking one or two arguments of hostname and
 port of the target gnats server.  If not supplied, the hostname
 defaults to localhost and the port to 1529.
+
+=head2 skip_version_check
+
+If you are using a custom gnats daemon, your version number might
+"not be supported".  If you are sure you know what you are doing
+and am willing to take the consequences:
+
+ my $g = Net::Gnats->new();
+ $g->skip_version_check(1);
 
 =head2 gnatsd_connect
 
