@@ -13,7 +13,7 @@ use IO::Socket::INET;
 use Net::Gnats::PR;
 use Net::Gnats::Response;
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 our @CARP_NOT;
 $OUTPUT_AUTOFLUSH = 1;
 
