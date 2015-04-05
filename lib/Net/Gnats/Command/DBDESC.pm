@@ -1,0 +1,41 @@
+package Net::Gnats::Command::DBDESC;
+use parent 'Net::Gnats::Command';
+use strictures;
+use Net::Gnats::Constants qw(CODE_INFORMATION CODE_INVALID_DATABASE);
+
+=head1 NAME
+
+Net::Gnats::Command::DEDESC
+
+=head1 DESCRIPTION
+
+Returns a human-readable description of the specified database.
+
+=head1 RESPONSES
+
+
+Responses include:
+
+6xx (internal error) An internal error was encountered while trying
+to read the list of available databases, usually due to lack of
+permissions or other filesystem-related problems, or the list of
+databases is empty.
+
+350 (CODE_INFORMATION) The normal response; the supplied text is the
+database description.
+
+417 (CODE_INVALID_DATABASE) The specified database name does not
+have an entry.
+
+=cut
+
+my $c = 'DBDESC';
+
+sub new {
+  my ( $class, %options ) = @_;
+
+  my $self = bless {}, $class;
+  return $self;
+}
+
+1;
