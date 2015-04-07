@@ -14,23 +14,20 @@ $module->set_series( 'getline',
                      "400 CODE_NONEXISTENT_PR\r\n",
                      "430 CODE_LOCKED_PR\r\n",
                      "666 THE_EVIL_CODE\r\n",
-                     "300 CODE_PR_READY\r\n",
+                     "300 PRs follow.\r\n",
                      get_pr(),
-                     "301 CODE_TEXT_READY\r\n",
-                     "301 CODE_TEXT_READY\r\n",
-                     "301 CODE_TEXT_READY\r\n",  # from creating new PR
                    );
 
 my $g = Net::Gnats->new();
 $g->gnatsd_connect;
 
-is $g->lock_pr         , undef, 'need two args, got zero';
-is $g->lock_pr(1)      , undef, 'need two args, got one';
-is $g->lock_pr(1, 'me'), undef, '440 CODE_CMD_ERROR';
-is $g->lock_pr(1, 'me'), undef, '400 CODE_NONEXISTENT_PR';
-is $g->lock_pr(1, 'me'), undef, '430 CODE_LOCKED_PR (someone else got it first)';
-is $g->lock_pr(1, 'me'), undef, '666 THE_EVIL_CODE';
-isa_ok $g->lock_pr(1, 'me'), 'Net::Gnats::PR', '300 CODE_PR_READY (recv)';
+is $g->lock_pr         , 0, 'need two args, got zero';
+is $g->lock_pr(1)      , 0, 'need two args, got one';
+is $g->lock_pr(1, 'me'), 0, '440 CODE_CMD_ERROR';
+is $g->lock_pr(1, 'me'), 0, '400 CODE_NONEXISTENT_PR';
+is $g->lock_pr(1, 'me'), 0, '430 CODE_LOCKED_PR (someone else got it first)';
+is $g->lock_pr(1, 'me'), 0, '666 THE_EVIL_CODE';
+is $g->lock_pr(1, 'me'), 1, '300 PRs follow.';
 
 done_testing();
 

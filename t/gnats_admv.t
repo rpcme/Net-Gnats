@@ -4,8 +4,7 @@ use Test::More;
 use Test::MockObject;
 use Test::MockObject::Extends;
 use Net::Gnats;
-
-plan tests => 1;
+use Net::Gnats::Command::ADMV;
 
 my $module = Test::MockObject::Extends->new('IO::Socket::INET');
 $module->fake_new( 'IO::Socket::INET' );
@@ -16,5 +15,11 @@ $module->set_series( 'getline',
 
 my $g = Net::Gnats->new();
 is($g->gnatsd_connect, 1);
+
+isa_ok my $a = Net::Gnats::Command::ADMV->new, 'Net::Gnats::Command::ADMV';
+isa_ok my $b = Net::Gnats::Command::ADMV->new( field => 'foo',
+                                               key => 'bar'), 'Net::Gnats::Command::ADMV';
+
+is $b->as_string, 'ADMV foo bar';
 
 done_testing;

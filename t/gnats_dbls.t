@@ -28,3 +28,4 @@ is( $g->lock_main_database, undef, 'ERROR UNK GARBAGE' );
 is( $g->lock_main_database, undef, 'CODE_CMD_ERROR');
 is( $g->lock_main_database, undef, 'CODE_CMD_ERROR');
 
+done_testing();

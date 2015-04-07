@@ -23,8 +23,8 @@ is $g->gnatsd_connect, 1;
 is $g->qfmt, 1, 'defaults to STANDARD';
 is $g->qfmt('full'), 1, 'FULL is OK';
 is $g->qfmt('summary'), 1, 'SUMMARY is OK';
-is $g->qfmt(''), undef, 'HIT CODE_CMD_ERROR';
-is $g->qfmt('%R%E%DEGFHF'), undef, 'bogus format error';
+is $g->qfmt(''), 0, 'HIT CODE_CMD_ERROR';
+is $g->qfmt('%R%E%DEGFHF'), 0, 'bogus format error';
 
 done_testing();
 

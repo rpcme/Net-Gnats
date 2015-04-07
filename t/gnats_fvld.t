@@ -11,9 +11,11 @@ $module->set_true( 'print' );
 $module->set_series( 'getline',
                      "200 my.gnatsd.com GNATS server 4.1.0 ready.\r\n",
                      "410 CODE_INVALID_FIELD_NAME\r\n",
-                     "301 CODE_TEXT_READY\r\n",
-                     "regexp1\n",
-                     "regexp2\n",
+                     "301 Valid values follow.\r\n",
+                     ".\r\n",
+                     "301 Valid values follow.\r\n",
+                     "regexp1\r\n",
+                     "regexp2\r\n",
                      ".\r\n",
                      "999 GARBAGE\r\n",
                    );
@@ -21,9 +23,10 @@ $module->set_series( 'getline',
 my $g = Net::Gnats->new();
 $g->gnatsd_connect;
 
-is $g->get_field_validators, undef, 'field not passed';
-is $g->get_field_validators('badfield'), undef, 'unknown field';
-is scalar @{  $g->get_field_validators('goodfield') }, 2, 'returned array of validators';
-is $g->get_field_validators('garbage'), undef, 'garbage';
+is $g->get_field_validators, 0, 'field not passed';
+is $g->get_field_validators('badfield'), 0, 'unknown field';
+is_deeply $g->get_field_validators('goodfield'), [], 'returned array of validators';
+is_deeply $g->get_field_validators('goodfield'), ['regexp1','regexp2'], 'returned array of validators';
+is $g->get_field_validators('garbage'), 0, 'garbage';
 
 done_testing();
