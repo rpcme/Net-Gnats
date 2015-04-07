@@ -1,92 +1,35 @@
 package Net::Gnats::Response;
 use 5.010_000;
-use utf8;
-use strict;
-use warnings;
-our $VERSION = '0.10';
+use strictures;
+use Net::Gnats::Constants qw(LF CODE_TEXT_READY CODE_PR_READY);
 
-# see perldoc for documentation
-sub new {
-  my ($class, $param) = @_;
-  my $self = bless {}, $class;
+{
+  my ($code, $raw, $type);
 
-  $self->{ raw } = q{};
-  $self->{ code} = -1;
-  my $raw  = defined $param->{raw}  ? $param->{raw}  : q{};
-  my $code = defined $param->{code} ? $param->{code} : -1;
-  $self->raw( $raw );
-  $self->code( $code );
-  $self->{inner_responses} = [];
-  return $self;
+# internally manage type
+  my $set_type = sub { $type = shift };
+  my $set_code = sub {
+    my $value = shift;
+    $code = -1 if $value !~ /\d\d\d/;
+    $code = $value;
+  };
+  my $set_raw = sub {
+    $raw = shift;
+  };
 }
-
-# see perldoc for documentation
-sub raw {
-  my ($self, $value) = @_;
-  if (defined $value) { $self->{raw} = $value; }
-  return $self->{raw};
-}
-
-# see perldoc for documentation
-sub code {
-  my ($self, $value) = @_;
-  if (defined $value) {
-    if ( $value !~ /\d\d\d/ ) {
-      return $self->{code}
-    }
-    $self->{code} = $value;
-  }
-  return $self->{code};
-}
-
-# see perldoc for documentation
-sub inner_responses {
-  my ($self, $value) = @_;
-
-  if (defined $value) {
-    if ( ref $value ne 'Net::Gnats::Response' ) {
-      return $self->{inner_responses}
-    }
-    push @{ $self->{inner_responses} }, $value;
-  }
-  return $self->{inner_responses};
-}
-
-# see perldoc for documentation
-sub as_list {
-  my ($self) = @_;
-  my $tmp = $self->raw;
-  $tmp =~ s/\r//gsxm;
-  my @lines = split /\n/sxm, $tmp;
-  shift @lines; # first item is the response message
-
-  return \@lines;
-}
-
-# see perldoc for documentation
-sub as_string {
-  my ( $self ) = @_;
-  return join "\n", @{ $self->raw };
-}
-
-1;
-
-__END__
-
-=encoding utf8
 
 =head1 NAME
 
 Net::Gnats::Response - A Gnats payload class.
 
-=head1 VERSION
-
-0.11
-
 =head1 DESCRIPTION
 
 For dealing with raw responses and error codes returned by
 Gnatsd. Enables an easier payload method.
+
+=head1 VERSION
+
+0.14
 
 =head1 SYNOPSIS
 
@@ -101,6 +44,271 @@ Gnatsd. Enables an easier payload method.
   $response->raw($data);
   $response->code($code);
 
+
+=head1 CONSTRUCTORS
+
+There are two types of constructors available.
+
+The first enables a 'shell' response which carries children responses.
+The shell response does not require initialization data.
+
+The second enables the capturing a full response. When initializing
+the response, the code and raw data must be passed to initialization.
+
+=head2 new
+
+Constructor for the shell Response object.
+
+ my $r = new(code => $code, raw => $raw)
+
+=cut
+
+sub new {
+  my ($class, %opt) = @_;
+  my $c = { trace => 0,
+            delim => ' ',
+            is_finished => 0,
+            content => [],
+            has_more => 0,
+          };
+  if (%opt) {
+    $c->{type} = $opt{type} if defined $opt{type};
+    $c->{code} = $opt{code} if defined $opt{code};
+    $c->{raw}  = $opt{raw}  if defined $opt{raw};
+  }
+
+  return bless $c, $class;
+}
+
+=head1 ACCESSORS
+
+The following public accessors are available.  All accessors are
+readonly because the response class expects the raw data to be
+submitted during instantiation.
+
+=head2 raw
+
+The readonly raw accessor retrieves raw result data for this particular
+response.  If this is a parent response for a single payload, then it
+will return an empty anonymous array.
+
+ my $r = Net::Gnats::Response( code => $code, raw => $raw );
+
+=cut
+
+sub raw {
+  my ( $self, $value ) = @_;
+  _trace('start raw');
+  $self->{raw} = [] if not defined $self->{raw};
+  push @{ $self->{raw} }, $value if defined $value;
+  $self->_process_line($value);
+  $self->_check_finish($value);
+  _trace('end raw');
+  return $self->{raw};
+}
+
+=head2 code
+
+The readonly code accessor for the result code.
+
+ my $r = Net::Gnats::Response( code => $code, raw => $raw );
+ return 1 if $r->code == Net::Gnats::CODE_OK;
+
+=cut
+
+sub code {
+  my ( $self ) = @_;
+  if ( $self->{type} == 1 ) { return 1; }
+  return $self->{code};
+}
+
+=head2 inner_responses
+
+The readonly accessor for fetching child responses.
+
+=cut
+
+sub inner_responses {
+  my ( $self ) = @_;
+
+  $self->{inner_responses} = [] if not defined $self->{inner_responses};
+  return $self->{inner_responses};
+}
+
+=head2 is_finished
+
+The response has completed processing.  Returns 1 if processing has
+completed, returns 0 otherwise.
+
+=cut
+
+sub is_finished {
+  return shift->{is_finished};
+}
+
+sub has_more { return shift->{has_more}; }
+
+=head2 status
+
+Retrieve the overall status of the response.  If this response, or all child responses,
+resulted positively then returns 1.  Otherwise, it returns 0.
+
+=cut
+
+sub status {
+  my ( $self ) = @_;
+  if ( $self->type == 1 ) {
+    foreach ( @{ $self->inner_responses } ) {
+      return 0 if $_->status == 0;
+    }
+    return 1;
+  }
+  return 0 if $self->code;
+}
+
+=head1 METHODS
+
+=begin
+
+=item as_list
+
+Assumes the Gnatsd payload response is a 'list' and parses it as so.
+
+Returns: Anonymous array of list items from this response and all
+children.
+
+=cut
+
+sub as_list {
+  my ($self) = @_;
+
+  # get children lists
+  if ( $self->{type} == 1 ) {
+    my $result = [];
+    for ( @{ $self->inner_responses } ) {
+      push @$result, @{ $_->as_list };
+    }
+    return $result;
+  }
+
+  return $self->{content};
+}
+
+=item as_string
+
+=back
+
+=cut
+
+sub as_string {
+  my ( $self ) = @_;
+  if ( $self->{type} == 1 ) {
+    print "getting children\n";
+    my $result = '';
+    my @responses = @{ $self->inner_responses };
+    my $last_response = pop @responses;
+    for ( @responses ) {
+      $result .= $_->as_string . ', ';
+    }
+    $result .= defined $last_response ? $last_response->as_string : '';
+    return $result;
+  }
+  return join ( $self->{delim}, @{ $self->{content} } );
+}
+
+
+sub add {
+  my ( $self, $response ) = @_;
+  print "Adding child\n";
+  if (ref $response eq 'ARRAY') {
+    push @{$self->{inner_responses}}, @{$response};
+  }
+  elsif ( not $response->isa('Net::Gnats::Response') ) {
+    warn "you tried adding a response that's not a response! Discarded.";
+    return $self;
+  }
+  push @{$self->{inner_responses}}, $response;
+  return $self;
+}
+
+
+
+=item _read_list
+
+This private method iterates a list block normally following a 301.
+It will return an anonymous array of data that should be applied to
+the response's raw structure.
+
+=cut
+
+# sub _read_list {
+#   my ( $self ) = @_;
+#   my $raw = [];
+#   while ( my $line = $self->_gsock->getline ) {
+#     last if not defined $line;
+#     last if $line =~ /^[.]\r\n/;
+#     $line = $self->_read_clean($line);
+#     debug('READ: [' . __LINE__ . '][' . $line . ']');
+#     push @$raw, $line;
+#   }
+#   debug('ENDED');
+#   return $raw;
+# }
+
+sub _check_finish {
+  my ( $self, $last ) = @_;
+  print "last: $last\n";
+  if ( $last eq '.' and
+       ($self->code == CODE_TEXT_READY or
+        $self->code == CODE_PR_READY)) {
+    print "Setting is_finished\n";
+    $self->{is_finished} = 1;
+    return;
+  }
+  elsif ($self->has_more == 1) {
+    $self->{is_finished} = 0;
+  }
+  elsif ($self->code != CODE_TEXT_READY and
+         $self->code != CODE_PR_READY) {
+    $self->{is_finished} = 1;
+  }
+}
+
+sub _process_line {
+  my ( $self, $raw ) = @_;
+  _trace('start _process_line');
+  #list
+  if ( defined $self->code and
+       ($self->code == CODE_TEXT_READY or
+        $self->code == CODE_PR_READY)) {
+    return if $raw eq '.';
+    push @{ $self->{content} }, $raw;
+    return;
+  }
+
+  # this is a list and code has already been processed
+  #return if defined $self->code;
+  my @result = $raw =~ /^(\d\d\d)([- ]?)(.*$)/sxm;
+  $self->{code} = $result[0];
+  $self->{has_more} = 1 if $result[1] eq '-';
+  $self->{has_more} = 0 if $result[1] eq ' ';
+  push @{ $self->{content} }, $result[2]
+    unless ( $self->code == CODE_TEXT_READY or
+             $self->code == CODE_PR_READY );
+  print "Code: " . $self->{code} . "\n";
+  return;
+}
+my $trace=1;
+sub _trace {
+  my ( $message ) = @_;
+  return if $trace == 0;
+  print 'TRACE(Response): [' . $message . ']' . LF;
+  return;
+}
+
+1;
+
+
 =head1 INCOMPATIBILITIES
 
 None.
@@ -108,32 +316,6 @@ None.
 =head1 SUBROUTINES/METHODS
 
 =over
-
-=item new()
-
-Constructor for the Response object.
-
-=item raw()
-
-Accessor for raw result data.
-
-=item $response->code()
-
-Accessor for the result code.
-
-=item $response->as_list()
-
-Assumes the Gnatsd payload response is a 'list' and parses it as so.
-
-Returns: Anonymous array of list items.
-
-=item $response->as_string()
-
-=back
-
-=head1 DIAGNOSTICS
-
-None.
 
 =head1 BUGS AND LIMITATIONS
 
@@ -147,6 +329,10 @@ None.
 
 None.
 
+=head1 DIAGNOSTICS
+
+None.
+
 =head1 AUTHOR
 
 Richard Elberger, riche@cpan.org
@@ -156,3 +342,6 @@ Richard Elberger, riche@cpan.org
 License: GPL V3
 
 (c) 2014 Richard Elberger
+
+=cut
+
