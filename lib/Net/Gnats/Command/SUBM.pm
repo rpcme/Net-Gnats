@@ -12,6 +12,11 @@ Net::Gnats::Command::SUBM
 Submits a new PR into the database. The supplied text is verified for
 correctness, and if no problems are found a new PR is created.
 
+=head1 PROTOCOL
+
+ SUBM
+ <PR CONTENTS>
+
 =head1 RESPONSES
 
 The possible responses are:

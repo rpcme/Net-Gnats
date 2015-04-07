@@ -13,6 +13,10 @@ Like the FDSC and FTYP commands, multiple field names may be listed
 with the command, and a response line will be returned for each one
 in the order that the fields appear on the command line.
 
+=head1 PROTOCOL
+
+ INPUTDEFAULT [fields...]
+
 =head1 RESPONSES
 
 Returns the suggested default value for a field when a PR is
@@ -28,8 +32,31 @@ my $c = 'INPUTDEFAULT';
 sub new {
   my ( $class, %options ) = @_;
 
-  my $self = bless {}, $class;
+  my $self = bless \%options, $class;
+  $self->{requests_multi} = 0;
+  if (ref $self->{fields} eq 'ARRAY') {
+    $self->{requests_multi} = 1 if scalar @{ $self->{fields} } > 1;
+  }
+  else {
+    $self->{fields} = [ $self->{fields} ];
+  }
   return $self;
+}
+
+sub as_string {
+  my ($self) = @_;
+  return $c . ' ' . join ( ' ', @{$self->{fields}} );
+}
+
+# this command can take multiple fields, each getting their own response.
+# so, we check that 'everything' is okay by looking at the parent response.
+sub is_ok {
+  my $self = shift;
+  if ( $self->{requests_multi} == 0 and
+       $self->response->code == CODE_INFORMATION) {
+    return 1;
+  }
+  return 0;
 }
 
 1;

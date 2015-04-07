@@ -13,6 +13,10 @@ Provides field-type-related information. Currently, only the
 property separators for MultiEnum fields is supported. When
 separators is specified, the possible return codes are:
 
+=head1 PROTOCOL
+
+ FTYPINFO [field] [property]
+
 =head1 RESPONSES
 
 350 (CODE_INFORMATION)
@@ -36,9 +40,19 @@ my $c = 'FTYPINFO';
 
 sub new {
   my ( $class, %options ) = @_;
-
-  my $self = bless {}, $class;
+  my $self = bless \%options, $class;
   return $self;
+}
+
+sub as_string {
+  my $self = shift;
+  return $c . ' ' . $self->{field} . ' ' . $self->{property};
+}
+
+sub is_ok {
+  my $self = shift;
+  return 1 if $self->response->code eq CODE_INFORMATION;
+  return 0;
 }
 
 1;

@@ -16,8 +16,11 @@ field. For most fields a regular expression is returned; for
 enumerated fields, the returned values are the list of legal strings
 that can be held in the field.
 
-=head1 RESPONSES
+=head1 PROTOCOL
 
+ FVLD [field]
+
+=head1 RESPONSES
 
 The possible responses are:
 
@@ -37,8 +40,19 @@ my $c = 'FVLD';
 sub new {
   my ( $class, %options ) = @_;
 
-  my $self = bless {}, $class;
+  my $self = bless \%options, $class;
   return $self;
+}
+
+sub as_string {
+  my $self =  shift;
+  return $c . ' ' . $self->{field};
+}
+
+sub is_ok {
+  my $self = shift;
+  return 1 if $self->response->code == CODE_TEXT_READY;
+  return 0;
 }
 
 1;

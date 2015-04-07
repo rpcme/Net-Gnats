@@ -18,6 +18,10 @@ Multiple EXPR commands may be issued; the expressions are boolean ANDed together
 
 Expressions are cleared by the RSET command.
 
+=head1 PROTOCOL
+
+ EXPR [query expression]
+
 =head1 RESPONSES
 
 
@@ -25,7 +29,7 @@ Possible responses include:
 
 415 (CODE_INVALID_EXPR) The specified expression is invalid, and could not be parsed.
 
-200 (CODE_OK) The expression has been accepted and will be used to limit the results returned from QUER.
+210 (CODE_OK) The expression has been accepted and will be used to limit the results returned from QUER.
 
 =cut
 

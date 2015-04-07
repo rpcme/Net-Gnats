@@ -13,11 +13,15 @@ Used to reset the internal server state. The current query expression
 is cleared, and the index of PRs may be reread if it has been updated
 since the start of the session.
 
+=head1 PROTOCOL
+
+ RSET
+
 =head1 RESPONSES
 
 The possible responses are:
 
-200 (CODE_OK)
+210 (CODE_OK)
 
 The state has been reset.
 
@@ -39,6 +43,17 @@ sub new {
 
   my $self = bless {}, $class;
   return $self;
+}
+
+sub as_string {
+  my $self = shift;
+  return $c;
+}
+
+sub is_ok {
+  my $self = shift;
+  return 1 if $self->response->code == CODE_OK;
+  return 0;
 }
 
 1;

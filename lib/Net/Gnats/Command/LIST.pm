@@ -40,6 +40,10 @@ blank characters such as spaces or newlines are considered empty.)
 
 Databases : Lists the set of databases.
 
+=head1 PROTOCOL
+
+ LIST [list type]
+
 =head1 RESPONSES
 
 The possible responses are:
@@ -53,11 +57,44 @@ making up the list as described above.
 
 my $c = 'LIST';
 
+my $s = { databases   => ['name', 'desc', 'path'],
+          categories  => ['name', 'desc', 'contact', 'notify'],
+          submitters  => ['name', 'desc', 'contract', 'response',
+                         'contact', 'othernotify'],
+          responsible => ['name', 'realname', 'email'],
+          states      => ['name', 'type', 'desc'],
+        };
+
 sub new {
   my ( $class, %options ) = @_;
-
-  my $self = bless {}, $class;
+  my $self = bless \%options, $class;
   return $self;
+}
+
+sub as_string {
+  my $self = shift;
+  return $c . ' ' . $self->{subcommand};
+}
+
+sub is_ok {
+  my $self = shift;
+  return 1 if $self->response->code == CODE_TEXT_READY;
+}
+
+sub formatted {
+  my $self = shift;
+  return [] if $self->response->code != CODE_TEXT_READY;
+
+  my $keynames = $s->{$self->{subcommand}};
+
+  my $result = [];
+  foreach my $row (@{ $self->response->as_list }) {
+    print "ROW: " . $row . "\n";
+    my @parts = split ':', $row;
+    push @{ $result}, { map { @{ $keynames }[$_] =>
+                                $parts[$_] } 0..( scalar @{$keynames} - 1) };
+  }
+  return $result;
 }
 
 1;

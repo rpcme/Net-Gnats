@@ -21,6 +21,10 @@ login screens etc.
 The list of databases follows, one per line, using the standard
 quoting mechanism. Only the database names are sent.
 
+=head1 PROTOCOL
+
+ DBLS
+
 =head1 RESPONSES
 
 The possible responses are:

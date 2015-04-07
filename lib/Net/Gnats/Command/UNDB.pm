@@ -12,6 +12,10 @@ Net::Gnats::Command::UNDB
 Unlocks the database. Any session may steal a database lock; no
 checking of any sort is done.
 
+=head1 PROTOCOL
+
+ UNDB
+
 =head1 RESPONSES
 
 The possible responses are:
@@ -31,10 +35,20 @@ because of permissions or other filesystem-related issues.
 my $c = 'UNDB';
 
 sub new {
-  my ( $class, %options ) = @_;
+  my ( $class ) = @_;
 
   my $self = bless {}, $class;
   return $self;
+}
+
+sub as_string {
+  return $c;
+}
+
+sub is_ok {
+  my $self = shift;
+  return 1 if $self->response->code == CODE_OK;
+  return 0;
 }
 
 1;

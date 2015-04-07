@@ -12,6 +12,10 @@ Net::Gnats::Command::EDITADDR
 Sets the e-mail address of the person communicating with gnatsd. The
 command requires at least the edit access level.
 
+=head1 PROTOCOL
+
+ EDITADDR [address]
+
 =head1 RESPONSES
 
 The possible responses are:

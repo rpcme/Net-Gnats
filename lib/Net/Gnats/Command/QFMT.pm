@@ -14,12 +14,16 @@ command. The query format may be either the name of a query format
 known to the server (see Named query definitions), or an actual
 query format (see Formatting query-pr output).
 
+=head1 PROTOCOL
+
+ QFMT <query format>
+
 =head1 RESPONSES
 
 The possible
 responses are:
 
-200 (CODE_OK) The normal response, which indicates that the query
+210 (CODE_OK) The normal response, which indicates that the query
     format is acceptable.
 
 440 (CODE_CMD_ERROR) No query format was supplied.
@@ -34,8 +38,19 @@ my $c = 'QFMT';
 sub new {
   my ( $class, %options ) = @_;
 
-  my $self = bless {}, $class;
+  my $self = bless \%options, $class;
   return $self;
+}
+
+sub as_string {
+  my $self = shift;
+  return $c . ' ' . $self->{format};
+}
+
+sub is_ok {
+  my $self = shift;
+  return 1 if $self->response->code == CODE_OK;
+  return 0;
 }
 
 1;

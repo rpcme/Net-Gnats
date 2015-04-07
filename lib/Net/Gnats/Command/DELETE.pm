@@ -15,11 +15,15 @@ successful, the PR is removed from the filesystem and the index
 file; a gap will be left in the numbering sequence for PRs. No
 checks are made that the PR is closed.
 
+=head1 PROTOCOL
+
+ DELETE [PR NUMBER]
+
 =head1 RESPONSES
 
 The possible responses are:
 
-200 (CODE_OK)
+210 (CODE_OK)
 
 The PR was successfully deleted.
 
@@ -48,8 +52,19 @@ my $c = 'DELETE';
 sub new {
   my ( $class, %options ) = @_;
 
-  my $self = bless {}, $class;
+  my $self = bless \%options, $class;
   return $self;
+}
+
+sub as_string {
+  my $self = shift;
+  return $c . ' ' . $self->{pr_number};
+}
+
+sub is_ok {
+  my $self = shift;
+  return 1 if $self->response->code == CODE_OK;
+  return 0;
 }
 
 1;

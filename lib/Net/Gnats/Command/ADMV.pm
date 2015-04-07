@@ -27,15 +27,29 @@ The responses are:
 350 (CODE_INFORMATION) The normal response; the supplied text is the
     requested field(s).
 
+=head1 EXAMPLES
+
+ my $entry = Net::Gnats::Command::ADMV->new( field => myfield, key => mykey )->as_string;
+
 =cut
 
 my $c = 'ADMV';
 
 sub new {
   my ( $class, %options ) = @_;
-
-  my $self = bless {}, $class;
+  return bless {}, $class if not %options;
+  my $self = bless { field => $options{field},
+                     key => $options{key} }, $class;
   return $self;
+}
+
+sub field { return shift->{field}; }
+
+sub key { return shift->{key}; }
+
+sub as_string {
+  my $self = shift;
+  return $c . ' ' . $self->{field} . ' ' . $self->{key};
 }
 
 1;

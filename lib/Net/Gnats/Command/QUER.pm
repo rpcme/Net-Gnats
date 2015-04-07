@@ -20,6 +20,10 @@ will be searched and/or output.
 The format of the output from the command is determined by the query
 format selected with the QFMT command.
 
+=head1 PROTOCOL
+
+ QUER [pr...]
+
 =head1 RESPONSES
 
 The possible responses are:
@@ -40,8 +44,20 @@ my $c = 'QUER';
 sub new {
   my ( $class, %options ) = @_;
 
-  my $self = bless {}, $class;
+  my $self = bless \%options, $class;
+  $self->{pr_numbers} = [] if not defined $self->{pr_numbers};
   return $self;
+}
+
+sub as_string {
+  my $self = shift;
+  return $c . join (' ' . @{ $self->{pr_numbers}} );
+}
+
+sub is_ok {
+  my $self = shift;
+  return 1 if $self->response->code == CODE_PR_READY;
+  return 0;
 }
 
 1;

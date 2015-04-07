@@ -11,8 +11,11 @@ Net::Gnats::Command::DEDESC
 
 Returns a human-readable description of the specified database.
 
-=head1 RESPONSES
+=head1 PROTOCOL
 
+ DBDESC [database]
+
+=head1 RESPONSES
 
 Responses include:
 

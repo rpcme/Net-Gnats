@@ -13,6 +13,10 @@ Locks the main gnats database. No subsequent database locks will
 succeed until the lock is removed. Sessions that attempt to write to
 the database will fail.
 
+=head1 PROTOCOL
+
+ LKDB
+
 =head1 RESPONSES
 
 The possible responses are:
@@ -34,10 +38,19 @@ not have been established.
 my $c = 'LKDB';
 
 sub new {
-  my ( $class, %options ) = @_;
-
+  my ( $class ) = @_;
   my $self = bless {}, $class;
   return $self;
+}
+
+sub as_string {
+  return $c;
+}
+
+sub is_ok {
+  my $self = shift;
+  return 1 if $self->response->code == CODE_OK;
+  return 0;
 }
 
 1;

@@ -22,6 +22,10 @@ The APPN and REPL commands lock the PR as part of the editing
 process, and they do not require that the PR be locked before they
 are invoked.
 
+=head1 PROTOCOL
+
+ LOCK <pr> <user> [pid]
+
 =head1 RESPONSES
 
 The possible responses are:
@@ -54,9 +58,23 @@ my $c = 'LOCK';
 
 sub new {
   my ( $class, %options ) = @_;
-
-  my $self = bless {}, $class;
+  my $self = bless \%options, $class;
   return $self;
+}
+
+sub as_string {
+  my $self = shift;
+  my $command = $c . ' ' . $self->{pr_number} . ' ' . $self->{user};
+  if (defined $self->{pid}) {
+    $command .= ' ' . $self->{pid};
+  }
+  return $command;
+}
+
+sub is_ok {
+  my $self = shift;
+  return 1 if $self->response->code == CODE_PR_READY;
+  return 0;
 }
 
 1;

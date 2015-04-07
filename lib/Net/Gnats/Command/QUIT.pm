@@ -14,6 +14,10 @@ Requests that the connection be closed.
 The QUIT command has the dubious distinction of being the only
 command that cannot fail.
 
+=head1 PROTOCOL
+
+ QUIT
+
 =head1 RESPONSES
 
 Possible responses:

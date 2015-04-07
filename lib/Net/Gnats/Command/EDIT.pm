@@ -13,6 +13,11 @@ Verifies the replacement text for PR. If the command is successful,
 the contents of PR are completely replaced with the supplied text. The
 PR must previously have been locked with the LOCK command.
 
+=head1 PROTOCOL
+
+ EDIT [PR NUMBER]
+ [PR CONTENTS]
+
 =head1 RESPONSES
 
 The possible responses are:

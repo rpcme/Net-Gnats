@@ -13,6 +13,10 @@ Specifies the userid and password for database access. Either both a
 username and password must be specified, or they both may be
 omitted; in the latter case, the current access level is returned.
 
+=head1 PROTOCOL
+
+ USER <User ID> <Password>
+
 =head1 RESPONSES
 
 The possible server responses are:
@@ -32,17 +36,19 @@ my $c = 'USER';
 sub new {
   my ( $class, %options ) = @_;
 
-  my $self = bless {}, $class;
+  my $self = bless \%options, $class;
   return $self;
 }
 
-sub user {
-  my ( $self, $uid, $pwd ) = @_;
-  my $c = 'USER';
+sub as_string {
+  my ( $self ) = @_;
+  return  $c . ' ' . $self->{username} . ' ' . $self->{password};
+}
 
-  $self->send_cmd( $c . $SPC . $uid . $SPC . $pwd );
-  is_error($r->code) and log_error($r) and return;
-  return $r;
+sub is_ok {
+  my ($self) = @_;
+  return 0 if $self->response->code == CODE_NO_ACCESS;
+  return 1;
 }
 
 1;

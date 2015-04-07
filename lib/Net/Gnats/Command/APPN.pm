@@ -1,7 +1,7 @@
 package Net::Gnats::Command::APPN;
 use parent 'Net::Gnats::Command';
 use strictures;
-use Net::Gnats::Constants qw(CODE_OK CODE_NONEXISTENT_PR CODE_INVALID_FIELD_NAME
+use Net::Gnats::Constants qw(CODE_SEND_TEXT CODE_OK CODE_NONEXISTENT_PR CODE_INVALID_FIELD_NAME
                              CODE_UNREADABLE_PR CODE_GNATS_LOCKED CODE_LOCKED_PR
                              CODE_INVALID_FIELD_CONTENTS);
 
@@ -52,6 +52,13 @@ sub new {
 
   my $self = bless {}, $class;
   return $self;
+}
+
+# Actually two commands, send this first and then the contents of the
+# field.
+sub as_string {
+  my ($self) = @_;
+  return $c . ' ' . $self->pr . ' ' . $self->field;
 }
 
 1;

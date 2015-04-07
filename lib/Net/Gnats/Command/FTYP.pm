@@ -9,7 +9,6 @@ Net::Gnats::Command::FTYP
 
 =head1 DESCRIPTION
 
-
 Describes the type of data held in the field(s) specified with the
 command.
 
@@ -51,6 +50,10 @@ TextWithRegex
 The value in the field must match one or more regular expressions
 associated with the field.
 
+=head1 PROTOCOL
+
+ FTYP [fields...]
+
 =head1 RESPONSES
 
 The possible responses are:
@@ -70,10 +73,33 @@ my $c = 'FTYP';
 
 sub new {
   my ( $class, %options ) = @_;
-
-  my $self = bless {}, $class;
+  my $self = bless \%options, $class;
+  $self->{requests_multi} = 0;
+  if (ref $self->{fields} eq 'ARRAY') {
+    $self->{requests_multi} = 1 if scalar @{ $self->{fields} } > 1;
+  }
+  else {
+    $self->{fields} = [ $self->{fields} ];
+  }
   return $self;
 }
+
+sub as_string {
+  my ($self) = @_;
+  return $c . ' ' . join ( ' ', @{$self->{fields}} );
+}
+
+# this command can take multiple fields, each getting their own response.
+# so, we check that 'everything' is okay by looking at the parent response.
+sub is_ok {
+  my $self = shift;
+  if ( $self->{requests_multi} == 0 and
+       $self->response->code == CODE_INFORMATION) {
+    return 1;
+  }
+  return 0;
+}
+
 
 1;
 

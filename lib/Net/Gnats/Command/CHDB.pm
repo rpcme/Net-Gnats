@@ -11,6 +11,10 @@ Net::Gnats::Command::CHDB
 
 Switches the current database to the name specified in the command.
 
+=head1 PROTOCOL
+
+ CHDB [database]
+
 =head1 RESPONSES
 
 The possible responses are:
@@ -38,6 +42,11 @@ sub new {
 
   my $self = bless {}, $class;
   return $self;
+}
+
+sub as_string {
+  my ($self) = @_;
+  return $c . ' ' . $c . ' ' . $self->database;
 }
 
 1;

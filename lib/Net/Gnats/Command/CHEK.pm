@@ -17,6 +17,10 @@ The initial argument indicates that the PR text to be checked is for a
 PR that will be newly created, rather than an edit or replacement of
 an existing PR.
 
+=head1 PROTOCOL
+
+ CHEK [initial]
+
 =head1 RESPONSES
 
 After the CHEK command is issued, the server will respond with either

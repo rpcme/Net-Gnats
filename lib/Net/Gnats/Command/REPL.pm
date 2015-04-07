@@ -15,6 +15,11 @@ client should then transmit the new field contents using the
 standard PR quoting mechanism. After the server has read the new
 contents, it then attempts to make the requested change to the PR.
 
+=head1 PROTOCOL
+
+ REPL <PR number> <field>
+ <CONTENTS>
+
 =head1 RESPONSES
 
 The possible responses are:

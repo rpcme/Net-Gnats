@@ -13,6 +13,10 @@ Net::Gnats::Command::UNLK
 Unlocks PR. Any user may unlock a PR, as no checking is done to
 determine if the requesting session owns the lock.
 
+=head1 PROTOCOL
+
+ UNLK <PR number>
+
 =head1 RESPONSES
 
 
@@ -22,7 +26,7 @@ The possible responses are:
 
 Insufficient or too many arguments were specified to the command.
 
-200 (CODE_OK)
+210 (CODE_OK)
 
 The PR was successfully unlocked.
 
@@ -42,8 +46,19 @@ my $c = 'UNLK';
 sub new {
   my ( $class, %options ) = @_;
 
-  my $self = bless {}, $class;
+  my $self = bless \%options, $class;
   return $self;
+}
+
+sub as_string {
+  my $self = shift;
+  return $c . ' ' . $self->{pr_number};
+}
+
+sub is_ok {
+  my $self = shift;
+  return 1 if $self->response->code == CODE_OK;
+  return 0;
 }
 
 1;
