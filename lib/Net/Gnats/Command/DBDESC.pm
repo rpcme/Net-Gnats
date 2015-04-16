@@ -1,7 +1,7 @@
 package Net::Gnats::Command::DBDESC;
 use parent 'Net::Gnats::Command';
 use strictures;
-use Net::Gnats::Constants qw(CODE_INFORMATION CODE_INVALID_DATABASE);
+use Net::Gnats::Constants qw(CODE_INFORMATION CODE_INVALID_DATABASE CODE_CMD_ERROR);
 
 =head1 NAME
 
@@ -30,6 +30,8 @@ database description.
 417 (CODE_INVALID_DATABASE) The specified database name does not
 have an entry.
 
+440 (CODE_CMD_ERROR) Required parameter not passed.
+
 =cut
 
 my $c = 'DBDESC';
@@ -37,8 +39,20 @@ my $c = 'DBDESC';
 sub new {
   my ( $class, %options ) = @_;
 
-  my $self = bless {}, $class;
+  my $self = bless \%options, $class;
+  $self->{name} = $self->{name} || '';
   return $self;
+}
+
+sub to_string {
+  my ($self) = @_;
+  return $c . ' ' . $self->{name};
+}
+
+sub is_ok {
+  my $self = shift;
+  return 1 if $self->response->code == CODE_INFORMATION;
+  return 0;
 }
 
 1;

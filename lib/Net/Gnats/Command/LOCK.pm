@@ -64,6 +64,8 @@ sub new {
 
 sub as_string {
   my $self = shift;
+  return undef if not defined $self->{pr_number};
+  return undef if not defined $self->{user};
   my $command = $c . ' ' . $self->{pr_number} . ' ' . $self->{user};
   if (defined $self->{pid}) {
     $command .= ' ' . $self->{pid};
@@ -73,6 +75,7 @@ sub as_string {
 
 sub is_ok {
   my $self = shift;
+  return 0 if not defined $self->response;
   return 1 if $self->response->code == CODE_PR_READY;
   return 0;
 }

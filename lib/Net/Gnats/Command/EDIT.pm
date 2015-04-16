@@ -1,7 +1,7 @@
 package Net::Gnats::Command::EDIT;
 use parent 'Net::Gnats::Command';
 use strictures;
-use Net::Gnats::Constants qw(CODE_SEND_PR CODE_GNATS_LOCKED CODE_NONEXISTENT_PR CODE_SEND_PR);
+use Net::Gnats::Constants qw(CODE_SEND_PR CODE_OK CODE_GNATS_LOCKED CODE_NONEXISTENT_PR CODE_SEND_PR);
 
 =head1 NAME
 
@@ -52,8 +52,26 @@ my $c = 'EDIT';
 sub new {
   my ( $class, %options ) = @_;
 
-  my $self = bless {}, $class;
+  my $self = bless \%options, $class;
+  $self->{pr_number} = '-1' if not defined $self->{pr_number};
   return $self;
 }
+
+sub as_string {
+  my ($self) = @_;
+  return undef if not defined $self->{pr_number};
+  return undef if not defined $self->{pr};
+  return $c . ' ' . $self->{pr_number};
+}
+
+sub is_ok {
+  my ($self) = @_;
+  # returned undef because command could not be run
+  return 0 if not defined $self->response;
+
+  return 1 if $self->response->code == CODE_OK;
+  return 0;
+}
+
 
 1;

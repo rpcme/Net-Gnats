@@ -5,26 +5,63 @@ use Test::MockObject;
 use Test::MockObject::Extends;
 use Net::Gnats;
 
-plan tests => 5;
+use File::Basename;
+use lib dirname(__FILE__);
+use Net::Gnats::TestData::Gtdata qw(connect_standard);
 
 my $module = Test::MockObject::Extends->new('IO::Socket::INET');
 $module->fake_new( 'IO::Socket::INET' );
 $module->set_true( 'print' );
 $module->set_series( 'getline',
-                     "200 my.gnatsd.com GNATS server 4.1.0 ready.\r\n",
-                     "200 CODE_OK\r\n",
-                     "600 CODE_CMD_ERROR\r\n",
-                     "GARBAGE faibfiaog7abviibovibusvidbu\r\n",
-                     "440 CODE_CMD_ERROR\r\n",
-                     "431 CODE_GNATS_LOCKED\r\n",
+                     @{ connect_standard() },
+                     "211 Ok.\r\n",
+                     "351-The added PR number is:\r\n",
+                     "350 666\r\n",
+                     "211 Ok.\r\n",
+                     "351-The added PR number is:\r\n",
+                     "350 667\r\n",
                    );
 
-my $g = Net::Gnats->new();
-$g->gnatsd_connect;
+my $g = Net::Gnats::Session->new();
+$g->gconnect;
 
-is( $g->lock_main_database, 1,     '200 locked' );
-is( $g->lock_main_database, undef, 'ERROR 600 Can lock database' );
-is( $g->lock_main_database, undef, 'ERROR UNK GARBAGE' );
-is( $g->lock_main_database, undef, 'CODE_CMD_ERROR');
-is( $g->lock_main_database, undef, 'CODE_CMD_ERROR');
+my $pr1 = Net::Gnats::PR->deserialize(schema => $g->schema, data => pr1());
+my $pr2 = Net::Gnats::PR->deserialize(schema => $g->schema, data => pr2());
 
+my $c1 = Net::Gnats::Command->subm;
+my $c2 = Net::Gnats::Command->subm(pr => $pr1);
+my $c3 = Net::Gnats::Command->subm(pr => $pr2);
+
+is $g->issue($c1)->is_ok, 0, 'c1 not ok';
+is $g->issue($c2)->is_ok, 1, 'c2 OK';
+is $g->issue($c3)->is_ok, 1, 'c3 OK - has number field but will be thrown out';
+
+
+done_testing();
+
+sub pr1 {
+  return ["To: bugs\r\n",
+          "Cc: \r\n",
+          "Subject: Your product sucks\r\n",
+          "From: riche\@cpan.org\r\n",
+          "Reply-To: riche\@cpan.org\r\n",
+          "X-Send-Pr-Version: Net::Gnats-5\r\n",
+          "\r\n",
+          ">Synopsis: A great synopsis\r\n",
+          ">Priority: high\r\n",
+          ".\r\n"];
+}
+
+sub pr2 {
+  return ["To: bugs\r\n",
+          "Cc: \r\n",
+          "Subject: Your product sucks\r\n",
+          "From: riche\@cpan.org\r\n",
+          "Reply-To: riche\@cpan.org\r\n",
+          "X-Send-Pr-Version: Net::Gnats-5\r\n",
+          "\r\n",
+          ">Number: 50\r\n",
+          ">Synopsis: A great synopsis\r\n",
+          ">Priority: high\r\n",
+          ".\r\n"];
+}

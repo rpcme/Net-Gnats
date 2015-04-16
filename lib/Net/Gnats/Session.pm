@@ -1,9 +1,11 @@
 package Net::Gnats::Session;
 use v5.10.00;
 use strictures;
+use Net::Gnats qw(verbose_level);
 use IO::Socket::INET;
 use Net::Gnats::Command qw(user quit);
-use Net::Gnats::Constants qw(LF CODE_GREETING CODE_PR_READY CODE_INFORMATION);
+use Net::Gnats::Constants qw(LF CODE_GREETING CODE_PR_READY CODE_SEND_PR CODE_SEND_TEXT CODE_INFORMATION);
+use Net::Gnats::Schema;
 
 $| = 1;
 
@@ -23,12 +25,6 @@ sub new {
   return bless \%o, $class;
 }
 
-my $trace = 1;
-
-BEGIN {
-  $trace = 1 if defined $ENV{GNATSD_TRACE};
-}
-
 =head1 ACCESSORS
 
 =head2 name
@@ -42,6 +38,28 @@ It does not mean anything to GNATS.
 sub name {
   my $self = shift;
   return $self->hostname . '-' . $self->username;
+}
+
+
+=head2 access
+
+Retrieves the access for the current database.
+
+=cut
+
+sub access { shift->{access}; }
+
+=head2 database
+
+Sets and retrieves the current database.  If a value is given then
+a change to the given database is made.
+
+=cut
+
+sub database {
+  my ($self, $value) = @_;
+  $self->{database} = 'default' if not defined $self->{database};
+  return $self->{database};
 }
 
 =head2 hostname
@@ -59,18 +77,24 @@ sub hostname {
   $self->{hostname};
 }
 
+sub is_authenticated {
+  my ( $self ) = @_;
+  $self->{authenticated} = 0 if not defined $self->{authenticated};
+  $self->{authenticated};
+}
+
 sub is_connected {
   my ( $self ) = @_;
   $self->{connected} = 0 if not defined $self->{connected};
   $self->{connected};
 }
 
-
-sub is_authenticated {
+sub no_schema {
   my ( $self ) = @_;
-  $self->{authenticated} = 0 if not defined $self->{authenticated};
-  $self->{authenticated};
+  $self->{no_schema} = 0 if not defined $self->{no_schema};
+  $self->{no_schema};
 }
+
 
 =head2 password
 
@@ -101,6 +125,14 @@ sub port {
   $self->{port};
 }
 
+=head2 schema
+
+Get the schema for this session.  Readonly.
+
+=cut
+
+sub schema { shift->{schema} }
+
 =head2 skip_version
 
 Set skip_version to override Gnats version checking. By default,
@@ -110,7 +142,12 @@ You use this at your own risk.
 
 =cut
 
-sub skip_version { shift->{skip_version} = 1; }
+sub skip_version {
+  my ($self, $value) = @_;
+  $self->{skip_version} = 0 if not defined $self->{skip_version};
+  $self->{skip_version} = $value if defined $value;
+  $self->{skip_version};
+}
 
 =head2 username
 
@@ -188,13 +225,21 @@ sub gconnect {
   # Grab the gnatsd version
   $self->gnatsd_version( $response->as_string );
 
-#    warn "? Error: GNATS Daemon version $self->{gnatsdVersion} at $self->{hostAddr} $self->{hostPort} is not supported by Net::Gnats" . LF;
-  return $self if not $self->check_gnatsd_version;
+  print "? Error: GNATS Daemon version $self->{version} at $self->{hostname} $self->{port} is not supported by Net::Gnats\n" if not $self->check_gnatsd_version;
+  if ( not  $self->check_gnatsd_version ) {
+    $self->issue(Net::Gnats::Command->quit);
+    $self->{connected} = 0;
+    return undef;
+  }
 
-  return $self if not defined $self->{username} or
-    not defined $self->{password};
+  # issue USER to get current access level
+  $self->{access} = $self->issue(Net::Gnats::Command->user)->level;
 
-  $self->authenticate;
+  $self->authenticate if defined $self->{username} and defined $self->{password};
+
+  return $self if $self->access eq 'none' or $self->access eq 'deny' or $self->access eq 'listdb';
+
+  $self->{schema} = Net::Gnats::Schema->new($self) unless $self->no_schema;
 
   return $self;
 }
@@ -222,7 +267,22 @@ codes and the literal values retrived from Gnats.
 
 sub issue {
   my ( $self, $command ) = @_;
+
+  # if the command cannot be formed, the as_string method will return
+  # undef.
+  return $command if not defined $command->as_string;
+
   $command->response( $self->_run( $command->as_string ) );
+  # Check CODE_SEND_TEXT or CODE_SEND_PR
+
+  # This will be a field object value.
+  if ($command->response->code == CODE_SEND_TEXT) {
+    $command->response( $self->_run( $command->field->value ) );
+  }
+  # This will be a whole serialized PR.
+  elsif ($command->response->code == CODE_SEND_PR) {
+    $command->response( $self->_run( $command->pr ) );
+  }
   return $command;
 }
 
@@ -328,7 +388,7 @@ sub _extract_list_content {
 
 sub _trace {
   my ( $message ) = @_;
-  return if $trace == 0;
+  return if Net::Gnats->verbose_level() != 3;
   print 'TRACE: [' . $message . ']' . LF;
   return;
 }

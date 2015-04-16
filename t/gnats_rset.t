@@ -5,21 +5,27 @@ use Test::MockObject;
 use Test::MockObject::Extends;
 use Net::Gnats;
 
+use File::Basename;
+use lib dirname(__FILE__);
+use Net::Gnats::TestData::Gtdata qw(connect_standard);
+
 my $module = Test::MockObject::Extends->new('IO::Socket::INET');
 $module->fake_new( 'IO::Socket::INET' );
 $module->set_true( 'print' );
 $module->set_series( 'getline',
-                     "200 my.gnatsd.com GNATS server 4.1.0 ready.\r\n",
+                     @{ connect_standard() },
                      "210 Reset state.\r\n",
                      "600 unknown\r\n",
                      "440 CODE_CMD_ERROR\r\n",
                    );
 
-my $g = Net::Gnats->new();
-$g->gnatsd_connect;
+my $g = Net::Gnats::Session->new();
+$g->gconnect;
 
-is $g->reset_server, 1, '210 reset';
-is $g->reset_server, 0, '600 unknown';
-is $g->reset_server, 0, '440 CODE_CMD_ERROR';
+my $c1 = Net::Gnats::Command->rset;
+
+is $g->issue($c1)->is_ok, 1, '210 reset';
+is $g->issue($c1)->is_ok, 0, '600 unknown';
+is $g->issue($c1)->is_ok, 0, '440 CODE_CMD_ERROR';
 
 done_testing();

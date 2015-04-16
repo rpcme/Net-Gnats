@@ -40,8 +40,23 @@ my $c = 'SUBM';
 sub new {
   my ( $class, %options ) = @_;
 
-  my $self = bless {}, $class;
+  my $self = bless \%options, $class;
   return $self;
+}
+
+sub as_string {
+  my ($self) = @_;
+  return undef if not defined $self->{pr};
+  return $c;
+}
+
+sub is_ok {
+  my ($self) = @_;
+  # returned undef because command could not be run
+  return 0 if not defined $self->response;
+
+  return 1 if $self->response->code == CODE_INFORMATION;
+  return 0;
 }
 
 1;

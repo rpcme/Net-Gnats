@@ -28,7 +28,7 @@ The user does not have permission to access the requested database.
 The database specified does not exist, or one or more configuration
 errors in the database were encountered.
 
-220 (CODE_OK)
+210 (CODE_OK)
 
 The current database is now database. Any operations performed will
 now be applied to database.
@@ -39,14 +39,21 @@ my $c = 'CHDB';
 
 sub new {
   my ( $class, %options ) = @_;
-
-  my $self = bless {}, $class;
+  my $self = bless \%options, $class;
   return $self;
 }
 
 sub as_string {
   my ($self) = @_;
-  return $c . ' ' . $c . ' ' . $self->database;
+  return undef if not defined $self->{database};
+  return $c . ' ' . $self->{database};
+}
+
+sub is_ok {
+  my ($self) = @_;
+  return 0 if not defined $self->response;
+  return 1 if $self->response->code == CODE_OK;
+  return 0;
 }
 
 1;

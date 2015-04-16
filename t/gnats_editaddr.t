@@ -5,26 +5,25 @@ use Test::MockObject;
 use Test::MockObject::Extends;
 use Net::Gnats;
 
-plan tests => 5;
+use File::Basename;
+use lib dirname(__FILE__);
+use Net::Gnats::TestData::Gtdata qw(connect_standard);
 
 my $module = Test::MockObject::Extends->new('IO::Socket::INET');
 $module->fake_new( 'IO::Socket::INET' );
 $module->set_true( 'print' );
 $module->set_series( 'getline',
-                     "200 my.gnatsd.com GNATS server 4.1.0 ready.\r\n",
-                     "200 CODE_OK\r\n",
-                     "600 CODE_CMD_ERROR\r\n",
-                     "GARBAGE faibfiaog7abviibovibusvidbu\r\n",
-                     "440 CODE_CMD_ERROR\r\n",
-                     "431 CODE_GNATS_LOCKED\r\n",
+                     @{ connect_standard() },
+                     "210 CODE_OK\r\n",
                    );
 
-my $g = Net::Gnats->new();
-$g->gnatsd_connect;
+my $g = Net::Gnats::Session->new;
+$g->gconnect;
 
-is( $g->lock_main_database, 1,     '200 locked' );
-is( $g->lock_main_database, undef, 'ERROR 600 Can lock database' );
-is( $g->lock_main_database, undef, 'ERROR UNK GARBAGE' );
-is( $g->lock_main_database, undef, 'CODE_CMD_ERROR');
-is( $g->lock_main_database, undef, 'CODE_CMD_ERROR');
+my $c1 = Net::Gnats::Command->editaddr( address => 'me\@foo.com' );
+my $c2 = Net::Gnats::Command->editaddr;
 
+is $g->issue($c1)->is_ok, 1, 'command is OK';
+is $g->issue($c2)->is_ok, 0, 'command is not OK';
+
+done_testing();

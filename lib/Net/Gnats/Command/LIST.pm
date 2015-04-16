@@ -73,23 +73,26 @@ sub new {
 
 sub as_string {
   my $self = shift;
+  return undef if not defined $self->{subcommand};
   return $c . ' ' . $self->{subcommand};
 }
 
 sub is_ok {
   my $self = shift;
+  return 0 if not defined $self->response;
   return 1 if $self->response->code == CODE_TEXT_READY;
+  return 0;
 }
 
 sub formatted {
   my $self = shift;
+  return [] if not defined $self->response;
   return [] if $self->response->code != CODE_TEXT_READY;
 
-  my $keynames = $s->{$self->{subcommand}};
+  my $keynames = $s->{lc $self->{subcommand}};
 
   my $result = [];
   foreach my $row (@{ $self->response->as_list }) {
-    print "ROW: " . $row . "\n";
     my @parts = split ':', $row;
     push @{ $result}, { map { @{ $keynames }[$_] =>
                                 $parts[$_] } 0..( scalar @{$keynames} - 1) };

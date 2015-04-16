@@ -21,7 +21,7 @@ the database will fail.
 
 The possible responses are:
 
-200 (CODE_OK) The lock has been established.
+210 (CODE_OK) The lock has been established.
 
 440 (CODE_CMD_ERROR) One or more arguments were supplied to the
 command.

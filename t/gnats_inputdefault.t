@@ -5,26 +5,36 @@ use Test::MockObject;
 use Test::MockObject::Extends;
 use Net::Gnats;
 
-plan tests => 5;
+use File::Basename;
+use lib dirname(__FILE__);
+use Net::Gnats::TestData::Gtdata qw(connect_standard);
 
 my $module = Test::MockObject::Extends->new('IO::Socket::INET');
 $module->fake_new( 'IO::Socket::INET' );
 $module->set_true( 'print' );
 $module->set_series( 'getline',
-                     "200 my.gnatsd.com GNATS server 4.1.0 ready.\r\n",
-                     "200 CODE_OK\r\n",
-                     "600 CODE_CMD_ERROR\r\n",
-                     "GARBAGE faibfiaog7abviibovibusvidbu\r\n",
-                     "440 CODE_CMD_ERROR\r\n",
-                     "431 CODE_GNATS_LOCKED\r\n",
+                     @{ connect_standard() },
+                     # not issued
+                     "350 A default value\r\n",
+                     "350-A default value for field1\r\n",
+                     "350 A default value for field2\r\n",
+                     "350 A default value\r\n",
+                     "350-A default value for field1\r\n",
+                     "350 A default value for field2\r\n",
                    );
 
-my $g = Net::Gnats->new();
-$g->gnatsd_connect;
+my $g = Net::Gnats::Session->new();
+$g->gconnect;
 
-is( $g->lock_main_database, 1,     '200 locked' );
-is( $g->lock_main_database, undef, 'ERROR 600 Can lock database' );
-is( $g->lock_main_database, undef, 'ERROR UNK GARBAGE' );
-is( $g->lock_main_database, undef, 'CODE_CMD_ERROR');
-is( $g->lock_main_database, undef, 'CODE_CMD_ERROR');
+my $c1 = Net::Gnats::Command->inputdefault;
+my $c2 = Net::Gnats::Command->inputdefault(fields => ['field']);
+my $c3 = Net::Gnats::Command->inputdefault(fields => ['field1', 'field2']);
 
+is $g->issue($c1)->is_ok, 0, 'c1 is NOT OK';
+is $g->issue($c2)->is_ok, 1, 'c2 is OK';
+is $g->issue($c3)->is_ok, 1, 'c3 is OK';
+
+is_deeply $g->issue($c2)->response->as_list, ['A default value'], 'c2 list is OK';
+is_deeply $g->issue($c3)->response->as_list, ['A default value for field1','A default value for field2'], 'c3 list is OK';
+
+done_testing();

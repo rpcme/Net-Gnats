@@ -28,8 +28,8 @@ sub initialize {
   my $c_fr = Net::Gnats::Command->list(subcommand => 'initialrequiredfields');
   my $c_fi = Net::Gnats::Command->list(subcommand => 'initialinputfields');
 
-  $self->{initial} = $session->issue{$c_fi}->response->as_list;
-  $self->{required} = $session->issue{$c_fr}->response->as_list;
+  $self->{initial} = $session->issue($c_fi)->response->as_list;
+  $self->{required} = $session->issue($c_fr)->response->as_list;
 
   my $c_types = Net::Gnats::Command->ftyp(fields => $fields);
   my $c_descs = Net::Gnats::Command->fdsc(fields => $fields);
@@ -61,9 +61,9 @@ Returns the field object for the named field.
 =cut
 
 sub field {
-  my ( $self, $field ) = @_;
-  return 0 if not defined $self->{fields}->{$field};
-  return $self->{fields}->{$field}
+  my ( $self, $name ) = @_;
+  return 0 if not defined $self->{fields}->{$name};
+  return $self->{fields}->{$name}
 }
 
 =head2 fields
@@ -72,7 +72,7 @@ Returns an anonymous array of all fields for this PR Schema.
 
 =cut
 
-sub fields { keys %{ shift->{fields} } }
+sub fields { [ keys %{ shift->{fields} } ] }
 
 =head2 initial
 

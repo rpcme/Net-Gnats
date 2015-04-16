@@ -1,22 +1,23 @@
 package Net::Gnats::Response;
-use 5.010_000;
+use v5.10.00;
 use strictures;
+use Net::Gnats qw(verbose_level);
 use Net::Gnats::Constants qw(LF CODE_TEXT_READY CODE_PR_READY);
 
-{
-  my ($code, $raw, $type);
+# {
+#   my ($code, $raw, $type);
 
-# internally manage type
-  my $set_type = sub { $type = shift };
-  my $set_code = sub {
-    my $value = shift;
-    $code = -1 if $value !~ /\d\d\d/;
-    $code = $value;
-  };
-  my $set_raw = sub {
-    $raw = shift;
-  };
-}
+# # internally manage type
+#   my $set_type = sub { $type = shift };
+#   my $set_code = sub {
+#     my $value = shift;
+#     $code = -1 if $value !~ /\d\d\d/;
+#     $code = $value;
+#   };
+#   my $set_raw = sub {
+#     $raw = shift;
+#   };
+# }
 
 =head1 NAME
 
@@ -70,14 +71,21 @@ sub new {
             is_finished => 0,
             content => [],
             has_more => 0,
+            type => 0,
           };
+  my $self = bless $c, $class;
+
   if (%opt) {
     $c->{type} = $opt{type} if defined $opt{type};
     $c->{code} = $opt{code} if defined $opt{code};
-    $c->{raw}  = $opt{raw}  if defined $opt{raw};
+    if (defined $opt{raw} and ref $opt{raw} eq 'ARRAY') {
+      foreach my $r (@{$opt{raw}}) {
+        $c->raw($r);
+      }
+    }
   }
 
-  return bless $c, $class;
+  return $self;
 }
 
 =head1 ACCESSORS
@@ -99,10 +107,10 @@ will return an empty anonymous array.
 sub raw {
   my ( $self, $value ) = @_;
   _trace('start raw');
-  $self->{raw} = [] if not defined $self->{raw};
+  $self->{raw} = []              if not defined $self->{raw};
   push @{ $self->{raw} }, $value if defined $value;
-  $self->_process_line($value);
-  $self->_check_finish($value);
+  $self->_process_line($value)   if defined $value;
+  $self->_check_finish($value)   if defined $value;
   _trace('end raw');
   return $self->{raw};
 }
@@ -203,7 +211,6 @@ sub as_list {
 sub as_string {
   my ( $self ) = @_;
   if ( $self->{type} == 1 ) {
-    print "getting children\n";
     my $result = '';
     my @responses = @{ $self->inner_responses };
     my $last_response = pop @responses;
@@ -219,7 +226,6 @@ sub as_string {
 
 sub add {
   my ( $self, $response ) = @_;
-  print "Adding child\n";
   if (ref $response eq 'ARRAY') {
     push @{$self->{inner_responses}}, @{$response};
   }
@@ -231,37 +237,11 @@ sub add {
   return $self;
 }
 
-
-
-=item _read_list
-
-This private method iterates a list block normally following a 301.
-It will return an anonymous array of data that should be applied to
-the response's raw structure.
-
-=cut
-
-# sub _read_list {
-#   my ( $self ) = @_;
-#   my $raw = [];
-#   while ( my $line = $self->_gsock->getline ) {
-#     last if not defined $line;
-#     last if $line =~ /^[.]\r\n/;
-#     $line = $self->_read_clean($line);
-#     debug('READ: [' . __LINE__ . '][' . $line . ']');
-#     push @$raw, $line;
-#   }
-#   debug('ENDED');
-#   return $raw;
-# }
-
 sub _check_finish {
   my ( $self, $last ) = @_;
-  print "last: $last\n";
   if ( $last eq '.' and
        ($self->code == CODE_TEXT_READY or
         $self->code == CODE_PR_READY)) {
-    print "Setting is_finished\n";
     $self->{is_finished} = 1;
     return;
   }
@@ -295,13 +275,12 @@ sub _process_line {
   push @{ $self->{content} }, $result[2]
     unless ( $self->code == CODE_TEXT_READY or
              $self->code == CODE_PR_READY );
-  print "Code: " . $self->{code} . "\n";
   return;
 }
-my $trace=1;
+
 sub _trace {
   my ( $message ) = @_;
-  return if $trace == 0;
+  return if Net::Gnats->verbose_level() != 3;
   print 'TRACE(Response): [' . $message . ']' . LF;
   return;
 }

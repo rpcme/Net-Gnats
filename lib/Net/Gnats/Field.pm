@@ -1,5 +1,6 @@
 package Net::Gnats::Field;
 use strictures;
+use Net::Gnats::FieldInstance;
 
 =head1 NAME
 
@@ -92,6 +93,9 @@ Creates an instance of this meta field.  Represents a literal field in a PR.
 
 =cut
 
-sub instance { ... }
+sub instance {
+  my $self = shift;
+  return Net::Gnats::FieldInstance->new( schema => $self, name => $self->name );
+}
 
 1;

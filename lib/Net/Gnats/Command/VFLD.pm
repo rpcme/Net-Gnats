@@ -1,7 +1,7 @@
 package Net::Gnats::Command::VFLD;
 use parent 'Net::Gnats::Command';
 use strictures;
-use Net::Gnats::Constants qw(CODE_SEND_TEXT CODE_INVALID_FIELD_NAME);
+use Net::Gnats::Constants qw(CODE_OK CODE_SEND_TEXT CODE_INVALID_FIELD_NAME);
 
 =head1 NAME
 
@@ -41,9 +41,21 @@ my $c = 'VFLD';
 
 sub new {
   my ( $class, %options ) = @_;
-
-  my $self = bless {}, $class;
+  my $self = bless \%options, $class;
   return $self;
+}
+
+sub as_string {
+  my ($self) = @_;
+  return undef if not defined $self->{field};
+  return $c . ' ' . $self->field->name;
+}
+
+sub is_ok {
+  my ($self) = @_;
+  return 0 if not defined $self->response;
+  return 1 if $self->response->code == CODE_OK;
+  return 0;
 }
 
 1;

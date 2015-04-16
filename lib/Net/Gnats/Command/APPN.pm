@@ -17,6 +17,10 @@ client should then transmit the new field contents using the
 standard PR quoting mechanism. After the server has read the new
 contents, it then attempts to make the requested change to the PR.
 
+=head1 PROTOCOL
+
+APPN 
+
 =head1 RESPONSES
 
 The possible responses are:
@@ -50,7 +54,7 @@ my $c = 'APPN';
 sub new {
   my ( $class, %options ) = @_;
 
-  my $self = bless {}, $class;
+  my $self = bless \%options, $class;
   return $self;
 }
 
@@ -58,7 +62,16 @@ sub new {
 # field.
 sub as_string {
   my ($self) = @_;
-  return $c . ' ' . $self->pr . ' ' . $self->field;
+  return undef if not defined $self->{pr_number};
+  return undef if not defined $self->{field};
+  return $c . ' ' . $self->{pr_number} . ' ' . $self->{field}->name;
+}
+
+sub is_ok {
+  my ($self) = @_;
+  return 0 if not defined $self->response;
+  return 1 if $self->response->code == CODE_OK;
+  return 0;
 }
 
 1;

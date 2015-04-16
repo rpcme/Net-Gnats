@@ -41,10 +41,20 @@ databases is empty.
 my $c = 'DBLS';
 
 sub new {
-  my ( $class, %options ) = @_;
-
-  my $self = bless {}, $class;
+  my ( $class ) = @_;
+  my %options = shift if $_;
+  my $self = bless \%options, $class;
   return $self;
+}
+
+sub as_string {
+  return $c;
+}
+
+sub is_ok {
+  my ($self) = @_;
+  return 1 if $self->response->code == CODE_TEXT_READY;
+  return 0;
 }
 
 1;

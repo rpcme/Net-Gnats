@@ -41,16 +41,20 @@ my $c = 'FTYPINFO';
 sub new {
   my ( $class, %options ) = @_;
   my $self = bless \%options, $class;
+  $self->{property} = 'separators' if not defined $self->{property};
   return $self;
 }
 
 sub as_string {
   my $self = shift;
+  return undef if not defined $self->{field};
+  return undef if not defined $self->{property};
   return $c . ' ' . $self->{field} . ' ' . $self->{property};
 }
 
 sub is_ok {
   my $self = shift;
+  return 0 if not defined $self->response;
   return 1 if $self->response->code eq CODE_INFORMATION;
   return 0;
 }

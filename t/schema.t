@@ -3,45 +3,43 @@ use warnings;
 use Test::More;
 use Test::MockObject;
 use Test::MockObject::Extends;
-use Net::Gnats;
+use Net::Gnats qw(verbose verbose_level);
 use Net::Gnats::Schema;
 use Net::Gnats::Session;
+
+Net::Gnats->verbose(1);
+Net::Gnats->verbose_level(1);
+
+use File::Basename;
+use lib dirname(__FILE__);
+use Net::Gnats::TestData::Gtdata qw(connect_standard);
 
 my $module = Test::MockObject::Extends->new('IO::Socket::INET');
 $module->fake_new( 'IO::Socket::INET' );
 $module->set_true( 'print' );
 $module->set_series( 'getline',
-                     "200 my.gnatsd.com GNATS server 4.1.0 ready.\r\n",
-                     "301 List follows.\r\n",
-                     "Field1\r\n",
-                     "Field2\r\n",
-                     ".\r\n",
-                     "350-Text\r\n",
-                     "350 Enum\r\n",
-                     "350-Description field1\r\n",
-                     "350 Description field2\r\n",
-                     "350-DEF_FIELD1\r\n",
-                     "350 DEF_FIELD2\r\n",
-                     "350-\r\n",
-                     "350 textsearch\r\n",
+                     @{ connect_standard() },
                    );
 
 my $g = Net::Gnats->new();
+print "Connecting\n";
 $g->gnatsd_connect;
 
 # initialize new schema
-isa_ok my $s = Net::Gnats::Schema->new( $g->session ), 'Net::Gnats::Schema';
+print "init schema\n";
+isa_ok my $s = $g->session->schema, 'Net::Gnats::Schema';
 
-is $s->field('Field1')->name, 'Field1';
-is $s->field('Field1')->description, 'Description field1';
-is $s->field('Field1')->type, 'Text';
-is $s->field('Field1')->default, 'DEF_FIELD1';
-is $s->field('Field1')->flags, '';
+print "lookup field\n";
+is $s->field('Synopsis')->name, 'Synopsis';
+is $s->field('Synopsis')->description, 'One-line summary of the PR';
+is $s->field('Synopsis')->type, 'Text';
+is $s->field('Synopsis')->default, '';
+is $s->field('Synopsis')->flags, 'textsearch ';
 
-is $s->field('Field2')->name, 'Field2';
-is $s->field('Field2')->description, 'Description field2';
-is $s->field('Field2')->type, 'Enum';
-is $s->field('Field2')->default, 'DEF_FIELD2';
-is $s->field('Field2')->flags, 'textsearch';
+is $s->field('Number')->name, 'Number';
+is $s->field('Number')->description, 'PR Number';
+is $s->field('Number')->type, 'Integer';
+is $s->field('Number')->default, '-1';
+is $s->field('Number')->flags, 'readonly ';
 
 done_testing();

@@ -39,8 +39,22 @@ my $c = 'EXPR';
 sub new {
   my ( $class, %options ) = @_;
 
-  my $self = bless {}, $class;
+  my $self = bless \%options, $class;
   return $self;
+}
+
+sub as_string {
+  my ($self) = @_;
+  return undef if not defined $self->{expressions};
+  return undef if ref( $self->{expressions} ) ne 'ARRAY';
+  return $c . ' ' . join( ' ', @{$self->{expressions}} );
+}
+
+sub is_ok {
+  my ($self) = @_;
+  return 0 if not defined $self->response;
+  return 1 if $self->response->code == CODE_OK;
+  return 0;
 }
 
 1;

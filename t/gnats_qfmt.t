@@ -5,11 +5,16 @@ use Test::MockObject;
 use Test::MockObject::Extends;
 use Net::Gnats;
 
+use File::Basename;
+use lib dirname(__FILE__);
+use Net::Gnats::TestData::Gtdata qw(connect_standard);
+
+
 my $module = Test::MockObject::Extends->new('IO::Socket::INET');
 $module->fake_new( 'IO::Socket::INET' );
 $module->set_true( 'print' );
 $module->set_series( 'getline',
-                     "200 my.gnatsd.com GNATS server 4.1.0 ready.\r\n",
+                     @{ connect_standard() },
                      "210 CODE_OK\r\n",
                      "210 CODE_OK\r\n",
                      "210 CODE_OK\r\n",
@@ -17,14 +22,22 @@ $module->set_series( 'getline',
                      "418 CODE_INVALID_QUERY_FORMAT\r\n",
                    );
 
-my $g = Net::Gnats->new();
+my $g = Net::Gnats::Session->new->gconnect;
 
-is $g->gnatsd_connect, 1;
-is $g->qfmt, 1, 'defaults to STANDARD';
-is $g->qfmt('full'), 1, 'FULL is OK';
-is $g->qfmt('summary'), 1, 'SUMMARY is OK';
-is $g->qfmt(''), 0, 'HIT CODE_CMD_ERROR';
-is $g->qfmt('%R%E%DEGFHF'), 0, 'bogus format error';
+my $c1 = Net::Gnats::Command->qfmt;
+my $c2 = Net::Gnats::Command->qfmt(format => 'full');
+my $c3 = Net::Gnats::Command->qfmt(format => 'summary');
+
+is $g->issue($c1)->is_ok, 0, 'c1 NOT OK';
+is $g->issue($c2)->is_ok, 1, 'c2 OK';
+is $g->issue($c3)->is_ok, 1, 'c3 OK';
+
+
+# is $g->qfmt, 1, 'defaults to STANDARD';
+# is $g->qfmt('full'), 1, 'FULL is OK';
+# is $g->qfmt('summary'), 1, 'SUMMARY is OK';
+# is $g->qfmt(''), 0, 'HIT CODE_CMD_ERROR';
+# is $g->qfmt('%R%E%DEGFHF'), 0, 'bogus format error';
 
 done_testing();
 

@@ -1,10 +1,12 @@
 package Net::Gnats::PR;
 use 5.010_000;
 use utf8;
-use strict;
-use warnings;
+use strictures;
 use Carp;
 use MIME::Base64;
+use Net::Gnats::Constants qw(FROM_FIELD REPLYTO_FIELD TO_FIELD CC_FIELD SUBJECT_FIELD SENDPR_VER_FIELD NOTIFY_FIELD);
+
+use Net::Gnats::FieldInstance;
 
 $| = 1;
 require Exporter;
@@ -12,21 +14,7 @@ require Exporter;
 our @ISA = qw(Exporter);
 our $VERSION = '0.11';
 
-# Items to export into callers namespace by default. Note: do not
-# export names by default without a very good reason. Use EXPORT_OK
-# instead.
-
-# Do not simply export all your public functions/methods/constants.
-
-# This allows declaration	use Net::Gnats ':all';
-# If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
-# will save memory.
-our %EXPORT_TAGS = ( 'all' => [ qw( ) ] );
-
-our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
-
-our @EXPORT = qw( );
-
+our @EXPORT_OK = qw( serialize deserialize parse_line);
 
 # TODO: These came from gnatsweb.pl for the parsepr and unparsepr routines.
 # should be done a better way?
@@ -44,38 +32,97 @@ our $REVISION = '$Id: PR.pm,v 1.8 2014/08/16 23:40:56 thacker Exp $'; #'
 # Returns: self
 #******************************************************************************
 sub new {
-    my ( $class, $gnatsobj ) = @_;
-    my $self = bless {}, $class;
+  my ( $class, %options ) = @_;
+  my $self = bless {}, $class;
 
-    $self->{__gnatsObj} = $gnatsobj;
-    $self->{number} = undef;
-    $self->{fields} = undef;
-    confess '? Error: Must pass Net::Gnats object as first argument'
-      if (not defined $self->{__gnatsObj});
-    return $self;
+    #    $self->{__gnatsObj} = $gnatsobj;
+  $self->{number} = undef;
+  $self->{fieldlist} = [];
+  return $self if not %options;
+  return $self;
 }
+
+sub add_field {
+  my ($self, $field) = @_;
+  $self->{fields}->{$field->name} = $field;
+  # manage the list of fields in order only if it's not a header field.
+  unless (_is_header_field($field->name)) {
+    push @{ $self->{fieldlist} }, $field->name;
+  }
+  return;
+}
+
+
+sub get_field {
+  my ($self, $fieldname) = @_;
+  return $self->{fields}->{$fieldname} if defined $self->{fields}->{$fieldname};
+  return undef;
+}
+
+=head2 setField()
+
+Sets a gnats field value.  Expects two arguments: the field name followed by
+the field value.
+
+=cut
 
 sub setField {
     my ($self, $field, $value, $reason) = @_;
-    $self->{fields}->{$field} = $value;
-    $self->{fields}->{$field."-Changed-Why"} = $reason
+    $self->{fields}->{$field}->value($value);
+    $self->{fields}->{$field . '-Changed-Why'}->value($reason)
       if (defined($reason)); # TODO: Anyway to find out if requireChangeReason?
 }
 
+=head2 getField
+
+Returns the string value of a PR field.
+
+ $pr->getField('field');
+
+DEPRECATION NOTICE: this will be deprecated in the near future.  Use instead:
+
+ $r->get_field('field')->value
+
+=cut
+
 sub getField {
     my ( $self, $field ) = @_;
-    return $self->{fields}->{$field};
+    return $self->{fields}->{$field}->value;
 }
 
-# This is legacy...
+=head2 getNumber()
+
+Returns the gnats PR number. In previous versions of gnatsperl the Number field was
+explicitly known to Net::Gnats::PR.  This method remains for backwards compatibility.
+
+DEPRECATION NOTICE: this will be deprecated in the near future.  Use instead:
+
+ $r->get_field('Number')->value
+
+=cut
+
 sub getNumber {
-  return $_[0]->getField("Number");
+  return shift->{fields}->{'Number'}->value;
 }
+
+=head2 getKeys
+
+Returns the list of PR fields contained in the object.
+
+=cut
 
 sub getKeys {
-    my $self = shift;
-    return keys(%{$self->{fields}});
+    return keys %{shift->{fields}};
 }
+
+=head2 asHash
+
+Returns the PR formatted as a hash.  The returned hash contains field names
+as keys, and the corresponding field values as hash values.
+
+CHANGE ALERT: This method now returns all FieldInstance objects.
+
+=cut
 
 sub asHash {
     my ( $self ) = shift;
@@ -83,7 +130,13 @@ sub asHash {
     return undef;
 }
 
-# This return remains, sine it was in the examples.
+=head2 asString
+
+Returns the PR object formatted as a Gnats recongizable string.  The result
+is suitable for submitting to Gnats.
+
+=cut
+
 sub asString {
   my $self = shift;
   return $self->unparse(@_);
@@ -138,8 +191,14 @@ sub fix_email_addrs
 }
 
 sub parse_line {
-  my ( $self, $line, $known_fields) = @_;
+  my ( $line, $known ) = @_;
   my $result = [];
+
+  if (_is_header_line($line)) {
+    my @found = $line =~ /^([\w\-]+):\s*(.*)$/;
+    return \@found;
+  }
+
   my @found = $line =~ /^>([\w\-]+):\s*(.*)$/;
 
   if ( not defined $found[0] ) {
@@ -147,7 +206,7 @@ sub parse_line {
     return $result;
   }
 
-  my $found = grep { $_ eq $found[0] } @{ $known_fields };
+  my $found = grep { $_ eq $found[0] } @{ $known };
 
   if ( $found == 0 ) {
     @{ $result }[1] = $line;
@@ -160,65 +219,124 @@ sub parse_line {
   return $result;
 }
 
-sub parse {
-  my $self  = shift;
+sub _clean {
+  my ( $self, $line ) = @_;
+  if ( not defined $line ) { return; }
 
-  # Get all known fields and hashify them.
-  my $fields_known = $self->{__gnatsObj}->list_fieldnames;
-  my $fields_have = {};
+  $line =~ s/\r|\n//gsm;
+#  $line =~ s/^[.][.]/./gsm;
+  return $line;
+}
 
-  my ( $field_last );
-  my $field_multi = 0;
+sub _is_header_line {
+  my ( $line ) = @_;
+  return 1 if $line =~ /^${\(FROM_FIELD)}:/;
+  return 1 if $line =~ /^${\(REPLYTO_FIELD)}:/;
+  return 1 if $line =~ /^${\(TO_FIELD)}:/;
+  return 1 if $line =~ /^${\(CC_FIELD)}:/;
+  return 1 if $line =~ /^${\(SUBJECT_FIELD)}:/;
+  return 1 if $line =~ /^${\(SENDPR_VER_FIELD)}:/;
+  return 1 if $line =~ /^${\(NOTIFY_FIELD)}:/;
+  return 0;
+}
 
-  foreach (@_) {
-    my $result = $self->parse_line( $_, $fields_known );
+sub _is_header_field {
+  my ( $name ) = @_;
+  return 1 if $name eq FROM_FIELD;
+  return 1 if $name eq REPLYTO_FIELD;
+  return 1 if $name eq TO_FIELD;
+  return 1 if $name eq CC_FIELD;
+  return 1 if $name eq SUBJECT_FIELD;
+  return 1 if $name eq SENDPR_VER_FIELD;
+  return 1 if $name eq NOTIFY_FIELD;
+  return 0;
+}
+
+sub _is_first_line {
+  my ( $line ) = @_;
+  return 1 if $line =~ /^${\(FROM_FIELD)}:/;
+  return 0;
+}
+
+=head2 deserialize
+
+Deserializes a PR from Gnats and returns a hydrated PR.
+
+ my $pr = Net::Gnats::PR->deserialize(raw => $c->response->raw,
+                                      schema => $s->schema);
+
+=cut
+
+sub deserialize {
+  my ($self, %options)  = @_;
+  my $data = $options{data};
+  my $schema = $options{schema};
+
+  my $pr = Net::Gnats::PR->new();
+  my $field;
+
+  foreach my $line (@{$options{data}}) {
+    $line = $self->_clean($line);
+    next if $line eq '' or $line eq '.';
+
+    my ( $name, $content ) = @{ parse_line( $line, $schema->fields ) };
+    next if not defined $name and $content eq '';
+
+    if ( defined $name and _is_first_line( $name . ':') ) {
+      # put last PR in array, start new PR
+    }
+
+    if ( defined $name and _is_header_line( $name . ':' ) ) {
+      $pr->add_field(Net::Gnats::FieldInstance->new( name => $name,
+                                                     value => $content,
+                                                     schema => $schema->field($name)));
+      next;
+    }
 
     # known header field found, save.
-    if ( defined @{ $result }[0] ) {
-      $fields_have->{ @{ $result }[0] } = @{ $result }[1];
-
-      # if the last field was a multi, remove its auto newline
-      if ( $field_multi ) {
-        $fields_have->{ $field_last } =~ s/\n$//;
-      }
-      $field_multi = 0;
-      $field_last = @{ $result }[0];
+    if ( defined $name ) {
+      $field = $schema->field( $name )->instance;
+      $field->value($content);
+      $pr->add_field($field);
     }
     # known header field not found, append to last.
     else {
-      if ( not defined $field_last ) { next; }
-      $field_multi = 1;
-      $fields_have->{ $field_last } .= @{ $result }[1] . "\n";
+      $field->value( $field->value . "\n" . $content );
+      $pr->setField($field);
     }
   }
 
-  $fields_have->{'Reply-To'} = $fields_have->{'Reply-To'} || $fields_have->{'From'};
-  delete $fields_have->{'From'};
 
-  $fields_have->{'X-GNATS-Notify'} ||= '';
+  $pr->get_field('Reply-To')->value($pr->get_field('From'))
+    if not defined $pr->get_field('Reply-To')->value;
+
+  # create X-GNATS-Notify if we did not receive it.
+  if (not defined $pr->get_field('X-GNATS-Notify')) {
+      $pr->add_field(Net::Gnats::FieldInstance->new( name => 'X-GNATS-Notify',
+                                                     value => '' ));
+  }
+  
+#  delete $fields_have->{'From'};
+
 
   # 3/30/99 kenstir: For some reason Unformatted always ends up with an
   # extra newline here.
-  $fields_have->{$UNFORMATTED_FIELD} ||= ''; # Default to empty value
-  $fields_have->{$UNFORMATTED_FIELD} =~ s/\n$//;
+  #$fields_have->{$UNFORMATTED_FIELD} ||= ''; # Default to empty value
+  #$fields_have->{$UNFORMATTED_FIELD} =~ s/\n$//;
 
   # Decode attachments stored in Unformatted field.
-  my $any_attachments = 0;
+#  my $any_attachments = 0;
 
-  my(@attachments) = split /$attachment_delimiter/, $fields_have->{$UNFORMATTED_FIELD};
+#  my(@attachments) = split /$attachment_delimiter/, $fields_have->{$UNFORMATTED_FIELD};
 
   # First element is any random text which precedes delimited attachments.
-  $fields_have->{$UNFORMATTED_FIELD} = shift @attachments;
-  foreach my $attachment (@attachments) {
-      $any_attachments = 1;
-      $attachment =~ s/^[ ]//mg;
-      add_decoded_attachment_to_pr($fields_have, decode_attachment($attachment));
-    }
-
-  foreach my $field (keys %{ $fields_have }) {
-    $fields_have->{$field} =~ s/\r// if defined $fields_have->{ $field };
-    $self->setField($field, $fields_have->{$field})
-  }
+#  $fields_have->{$UNFORMATTED_FIELD} = shift @attachments;
+#  foreach my $attachment (@attachments) {
+#      $any_attachments = 1;
+#      $attachment =~ s/^[ ]//mg;
+#      add_decoded_attachment_to_pr($fields_have, decode_attachment($attachment));
+  #    }
+  return $pr;
 }
 
 # unparse -
@@ -229,79 +347,79 @@ sub parse {
 #         'gnatsd'  - PR will be filed using gnatsd; proper '.' escaping done
 #         'send'    - PR will be field using gnatsd, and is an initial PR.
 #         'test'    - we're being called from the regression tests
-sub unparse {
-  my ( $self, $purpose ) = @_;
-  $purpose ||= 'gnatsd';
+
+# What is the user from the session?  Need to have user passed for originator.
+sub serialize {
+  my ( $self, $pr, $user ) = @_;
+  my $purpose ||= 'gnatsd';
+  $user ||= 'bugs';
   my ( $tmp, $text );
   my $debug = 0;
 
   # First create or reconstruct the Unformatted field containing the
   # attachments, if any.
-  my %fields = %{$self->{fields}};
-  $fields{$UNFORMATTED_FIELD} ||= ''; # Default to empty.
-  warn "unparsepr 1 =>$fields{$UNFORMATTED_FIELD}<=\n" if $debug;
-  my $array_ref = $fields{'attachments'};
-  foreach my $hash_ref (@$array_ref) {
-    my $attachment_data = $$hash_ref{'original_attachment'};
-    # Deleted attachments leave empty hashes behind.
-    next unless defined($attachment_data);
-    $fields{$UNFORMATTED_FIELD} .= $attachment_delimiter . $attachment_data . "\n";
-  }
-  warn "unparsepr 2 =>$fields{$UNFORMATTED_FIELD}<=\n" if $debug;
+  my %fields = %{$pr->{fields}};
 
-  # Reconstruct the text of the PR into $text.
-  # Build the envelope if necessary.
-  if (exists $fields{'envelope'}) {
-    $text = $fields{'envelope'};
-  } else {
-    $text = "To: bugs
-CC:
-Subject: $fields{$SYNOPSIS_FIELD}
-From: $fields{$ORIGINATOR_FIELD}
-Reply-To: $fields{$ORIGINATOR_FIELD}
-X-Send-Pr-Version: Net::Gnats-$Net::Gnats::VERSION ($REVISION)
+  #if (not defined $pr->get_field('Unformatted')) {
+  #  $pr->add_field(Net::Gnats::FieldInstance->new( name => $UNFORMATTED_FIELD,
+  #                                                 value => '',
+  #                                                 schema => ));
+  #}
 
-";
-  }
+  # deal with attachment later
+  # my $array_ref = $fields{'attachments'};
+  # foreach my $hash_ref (@$array_ref) {
+  #   my $attachment_data = $$hash_ref{'original_attachment'};
+  #   # Deleted attachments leave empty hashes behind.
+  #   next unless defined($attachment_data);
+  #   $fields{$UNFORMATTED_FIELD} .= $attachment_delimiter . $attachment_data . "\n";
+  # }
+  # warn "unparsepr 2 =>$fields{$UNFORMATTED_FIELD}<=\n" if $debug;
 
-  foreach (@{ $self->{__gnatsObj}->list_fieldnames } ) {
-    next if /^.$/;
-    next if (not defined($fields{$_})); # Don't send fields that aren't defined.
+  # Headers are necessary because Gnats expects it.
+  $text .= FROM_FIELD . ': '     . $user . "\n";
+  $text .= REPLYTO_FIELD . ': ' . $user . "\n";
+  $text .= TO_FIELD . ': bugs' . "\n";
+  $text .= CC_FIELD . ': ' . "\n";
+  $text .= SUBJECT_FIELD . ': ' . $pr->get_field($SYNOPSIS_FIELD)->value . "\n";
+  $text .= SENDPR_VER_FIELD . ': Net::Gnats ' . $Net::Gnats::VERSION . "\n";
+  $text .= "\n";
+
+  foreach my $fn (@{ $pr->{fieldlist} } ) {
+    my $field = $pr->get_field($fn);
+    #next if /^.$/;
+    #next if (not defined($fields{$_})); # Don't send fields that aren't defined.
     # Do include Unformatted field in 'send' operation, even though
     # it's excluded.  We need it to hold the file attachment.
     # XXX ??? !!! FIXME
-    if(($purpose eq 'send')
-       && (! ($self->{__gnatsObj}->getFieldTypeInfo ($_, 'flags') & $SENDINCLUDE))
-       && ($_ ne $UNFORMATTED_FIELD))
-    {
-      next;
-    }
-    $fields{$_} ||= ''; # Default to empty
-    if($self->{__gnatsObj}->getFieldType($_) eq 'MultiText')
-    {
-      # Lines which begin with a '.' need to be escaped by another '.'
-      # if we're feeding it to gnatsd.
-      $tmp = $fields{$_};
+    
+#    if(($purpose eq 'send')
+#       && (! ($self->{__gnatsObj}->getFieldTypeInfo ($_, 'flags') & $SENDINCLUDE))
+#       && ($_ ne $UNFORMATTED_FIELD))
+#    {
+#      next;
+#    }
+
+    
+#    $fields{$_} ||= ''; # Default to empty
+    if ( $field->schema->type eq 'MultiText' ) {
+      $tmp = $field->value;
       $tmp =~ s/\r//;
-      $tmp =~ s/^[.]/../gm
-            if ($purpose ne 'test');
+      $tmp =~ s/^[.]/../gm;
       chomp($tmp);
-      $tmp .= "\n" if ($tmp ne ""); # Make sure it ends with newline.
-      $text .= sprintf(">$_:\n%s", $tmp);
+      $text .= sprintf(">$_:\n%s\n", $tmp);
     }
-    else
-    {
+    else {
       # Format string derived from gnats/pr.c.
-      $text .= sprintf("%-16s %s\n", ">$_:", $fields{$_});
+      $text .= sprintf("%-16s %s\n", '>' . $field->name . ':', $field->value);
     }
-    if (exists ($fields{$_."-Changed-Why"}))
-    {
+
+    if ($pr->get_field($field->name . '-Changed-Why')) {
       # Lines which begin with a '.' need to be escaped by another '.'
       # if we're feeding it to gnatsd.
-      $tmp = $fields{$_."-Changed-Why"};
-      $tmp =~ s/^[.]/../gm
-            if ($purpose ne 'test');
-      $text .= sprintf(">$_-Changed-Why:\n%s\n", $tmp);
+      $tmp = $pr->get_field($_."-Changed-Why")->value;
+      $tmp =~ s/^[.]/../gm;
+      $text .= sprintf(">%s-Changed-Why:\n%s\n", $field->name, $tmp);
     }
   }
   $text =~ s/\r//;
@@ -388,38 +506,11 @@ a PR file directly from the database.
 
 Constructor, no arguments.
 
-=head2 setField()
-
-Sets a gnats field value.  Expects two arguments: the field name followed by
-the field value.
-
-=head2 getField()
-
-Returns the string value of a PR field.
-
-=head2 getNumber()
-
-Returns the gnats PR number. In previous versions of gnatsperl the Number field was
-explicitly known to Net::Gnats::PR.  This method remains for backwards compatibility.
-
-=head2 asHash()
-
-Returns the PR formatted as a hash.  The returned hash contains field names
-as keys, and the corresponding field values as hash values.
-
-=head2 getKeys()
-
-Returns the list of PR fields contained in the object.
 
 
-=head2 asString()
 
-Returns the PR object formatted as a Gnats recongizable string.  The result
-is suitable for submitting to Gnats.
 
-=head2 setFromString()
 
-Parses a Gnats formatted PR and sets the object's fields accordingly.
 
 
 

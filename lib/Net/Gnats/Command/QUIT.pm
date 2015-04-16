@@ -29,16 +29,20 @@ my $c = 'QUIT';
 
 sub new {
   my ( $class, %options ) = @_;
-
   my $self = bless {}, $class;
   return $self;
 }
 
-sub send_command {
-  my ( $self ) = @_;
-  $self->{RESPONSE} = $self->SUPER::send_command($c);
-  return $self;
+sub as_string {
+  my ($self) = @_;
+  return $c;
 }
 
+sub is_ok {
+  my ($self) = @_;
+  return 0 if not defined $self->response;
+  return 1 if $self->response->code == CODE_CLOSING;
+  return 0;
+}
 
 1;

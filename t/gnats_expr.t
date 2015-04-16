@@ -5,33 +5,46 @@ use Test::MockObject;
 use Test::MockObject::Extends;
 use Net::Gnats;
 
+use File::Basename;
+use lib dirname(__FILE__);
+use Net::Gnats::TestData::Gtdata qw(connect_standard);
+
 my $module = Test::MockObject::Extends->new('IO::Socket::INET');
 $module->fake_new( 'IO::Socket::INET' );
 $module->set_true( 'print' );
 $module->set_series( 'getline',
-                     "200 my.gnatsd.com GNATS server 4.1.0 ready.\r\n",
-                     "415 CODE_INVALID_EXPR\r\n",
-                     "200 CODE_OK\r\n",           # Single
-                     "200 CODE_OK\r\n",           # Mult 1
-                     "200 CODE_OK\r\n",           # Mult 1
+                     @{ connect_standard() },
+                     "210 CODE_OK\r\n",           # Single
+                     # cmd does not get defined
+                     "210 CODE_OK\r\n",           # Mult 1
+                     "210 CODE_OK\r\n",           # Mult 1
                    );
 
-my $g = Net::Gnats->new();
-$g->gnatsd_connect;
+my $g = Net::Gnats::Session->new;
+$g->gconnect;
 
+my $c1 = Net::Gnats::Command->expr( expressions => ['Priority="High"'] );
+my $c2 = Net::Gnats::Command->expr;
+
+is $c1->as_string, 'EXPR Priority="High"';
+is $c2->as_string, undef;
+
+is $g->issue($c1)->is_ok, 1, 'Command is OK';
+is $g->issue($c2)->is_ok, 0, 'Command is NOT OK';
+
+## Legacy
 # No expressions, undef
-is $g->expr, undef, 'must have a query expression';
+#is $g->expr, undef, 'must have a query expression';
 
 # Bad expression
-is $g->expr('bad'), undef, 'Bad expression';
+#is $g->expr('bad'), undef, 'Bad expression';
 
 # Single expression
-is $g->expr('expr1'), 1, 'Single expression ok';
+#is $g->expr('expr1'), 1, 'Single expression ok';
 
 # Multiple expression
-is $g->expr('expr1','expr2'), 1, 'Multiple expression ok';
+#is $g->expr('expr1','expr2'), 1, 'Multiple expression ok';
 
-# Todo: which expressions are bad?
 
 done_testing();
 

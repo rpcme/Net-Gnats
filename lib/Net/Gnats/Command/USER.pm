@@ -26,7 +26,7 @@ The possible server responses are:
 422 (CODE_NO_ACCESS) A matching username and password could not be
 found.
 
-200 (CODE_OK) A matching username and password was found, and the
+210 (CODE_OK) A matching username and password was found, and the
 login was successful.
 
 =cut
@@ -42,11 +42,39 @@ sub new {
 
 sub as_string {
   my ( $self ) = @_;
-  return  $c . ' ' . $self->{username} . ' ' . $self->{password};
+  return $c if not defined $self->{username};
+  return undef if not defined $self->{password};
+  return $c . ' ' . $self->{username} . ' ' . $self->{password};
+}
+
+sub level {
+  my ($self) = @_;
+  # get response.  if username is specified, we will get a database
+  # for the first content string.  if not specified, we simply get the
+  # level from the second result.
+
+  # Examples:
+  # USER madmin madmin
+  # 210-Now accessing GNATS database 'default'
+  # 210 User access level set to 'admin'
+
+  # user
+  # 351-The current user access level is:
+  # 350 admin
+
+  if ( defined $self->{username} ) {
+    $self->{db}    = @{$self->response->as_list}[0] =~ /Now accessing GNATS database '(.*)'/;
+    $self->{level} = @{$self->response->as_list}[1] =~ /User access level set to '(.*)'/;
+  }
+  else {
+    $self->{level} = @{$self->response->as_list}[1];
+  }
+  return $self->{level};
 }
 
 sub is_ok {
   my ($self) = @_;
+  return 0 if not defined $self->response;
   return 0 if $self->response->code == CODE_NO_ACCESS;
   return 1;
 }

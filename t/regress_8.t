@@ -11,7 +11,6 @@ else {
 }
 
 use Net::Gnats;
-Net::Gnats::debug_gnatsd;
 
 my $conn1 = {
              server   => 'localhost',

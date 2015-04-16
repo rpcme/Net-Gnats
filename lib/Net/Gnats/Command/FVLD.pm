@@ -46,11 +46,13 @@ sub new {
 
 sub as_string {
   my $self =  shift;
+  return undef if not defined $self->{field};
   return $c . ' ' . $self->{field};
 }
 
 sub is_ok {
   my $self = shift;
+  return 0 if not defined $self->response;
   return 1 if $self->response->code == CODE_TEXT_READY;
   return 0;
 }
