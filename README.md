@@ -5,3 +5,7 @@ Net-Gnats
 [![CPAN version](https://badge.fury.io/pl/Net-Gnats.svg)](http://badge.fury.io/pl/Net-Gnats)
 
 Repository for the Net::Gnats module.
+
+Version
+-------
+The current version is 0.15.
