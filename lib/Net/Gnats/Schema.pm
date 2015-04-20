@@ -1,5 +1,10 @@
 package Net::Gnats::Schema;
 use strictures;
+BEGIN {
+  $Net::Gnats::VERSION = '0.15';
+}
+use vars qw($VERSION);
+
 use Net::Gnats::Command;
 use Net::Gnats::Field;
 use Net::Gnats::PR;

@@ -1,6 +1,11 @@
 package Net::Gnats::Command::QUER;
 use parent 'Net::Gnats::Command';
 use strictures;
+BEGIN {
+  $Net::Gnats::VERSION = '0.15';
+}
+use vars qw($VERSION);
+
 use Net::Gnats::Constants qw(CODE_PR_READY CODE_INVALID_QUERY_FORMAT CODE_NO_PRS_MATCHED);
 
 =head1 NAME

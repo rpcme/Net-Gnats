@@ -2,6 +2,12 @@ package Net::Gnats::PR;
 use 5.010_000;
 use utf8;
 use strictures;
+
+BEGIN {
+  $Net::Gnats::VERSION = '0.15';
+}
+use vars qw($VERSION);
+
 use Carp;
 use MIME::Base64;
 use Net::Gnats::Constants qw(FROM_FIELD REPLYTO_FIELD TO_FIELD CC_FIELD SUBJECT_FIELD SENDPR_VER_FIELD NOTIFY_FIELD);
@@ -10,10 +16,7 @@ use Net::Gnats::FieldInstance;
 
 $| = 1;
 require Exporter;
-
 our @ISA = qw(Exporter);
-our $VERSION = '0.11';
-
 our @EXPORT_OK = qw( serialize deserialize parse_line);
 
 # TODO: These came from gnatsweb.pl for the parsepr and unparsepr routines.

@@ -1,6 +1,11 @@
 package Net::Gnats::Command::USER;
 use parent 'Net::Gnats::Command';
 use strictures;
+BEGIN {
+  $Net::Gnats::VERSION = '0.15';
+}
+use vars qw($VERSION);
+
 use Net::Gnats::Constants qw(CODE_INFORMATION CODE_NO_ACCESS CODE_OK);
 
 =head1 NAME

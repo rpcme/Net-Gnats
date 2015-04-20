@@ -1,5 +1,10 @@
 package Net::Gnats::Constants;
 use strictures;
+BEGIN {
+  $Net::Gnats::VERSION = '0.15';
+}
+use vars qw($VERSION);
+
 require Exporter;
 our @ISA = qw(Exporter);
 

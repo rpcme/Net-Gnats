@@ -1,6 +1,11 @@
 package Net::Gnats::Command::SUBM;
 use parent 'Net::Gnats::Command';
 use strictures;
+BEGIN {
+  $Net::Gnats::VERSION = '0.15';
+}
+use vars qw($VERSION);
+
 use Net::Gnats::Constants qw(CODE_GNATS_LOCKED CODE_SEND_PR CODE_INFORMATION_FILLER CODE_INFORMATION);
 
 =head1 NAME

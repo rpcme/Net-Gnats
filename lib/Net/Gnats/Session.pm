@@ -1,6 +1,11 @@
 package Net::Gnats::Session;
 use v5.10.00;
 use strictures;
+BEGIN {
+  $Net::Gnats::VERSION = '0.15';
+}
+use vars qw($VERSION);
+
 use Net::Gnats qw(verbose_level);
 use IO::Socket::INET;
 use Net::Gnats::Command qw(user quit);

@@ -1,6 +1,11 @@
 package Net::Gnats::Command::UNDB;
 use parent 'Net::Gnats::Command';
 use strictures;
+BEGIN {
+  $Net::Gnats::VERSION = '0.15';
+}
+use vars qw($VERSION);
+
 use Net::Gnats::Constants qw(CODE_OK CODE_GNATS_NOT_LOCKED CODE_CMD_ERROR);
 
 =head1 NAME

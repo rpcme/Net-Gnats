@@ -1,5 +1,10 @@
 package Net::Gnats::Field;
 use strictures;
+BEGIN {
+  $Net::Gnats::VERSION = '0.15';
+}
+use vars qw($VERSION);
+
 use Net::Gnats::FieldInstance;
 
 =head1 NAME

@@ -1,6 +1,11 @@
 package Net::Gnats::Command::QFMT;
 use parent 'Net::Gnats::Command';
 use strictures;
+BEGIN {
+  $Net::Gnats::VERSION = '0.15';
+}
+use vars qw($VERSION);
+
 use Net::Gnats::Constants qw(CODE_OK CODE_CMD_ERROR CODE_INVALID_QUERY_FORMAT);
 
 =head1 NAME

@@ -1,6 +1,11 @@
 package Net::Gnats::Command::EXPR;
 use parent 'Net::Gnats::Command';
 use strictures;
+BEGIN {
+  $Net::Gnats::VERSION = '0.15';
+}
+use vars qw($VERSION);
+
 use Net::Gnats::Constants qw(CODE_OK CODE_INVALID_EXPR);
 
 =head1 NAME

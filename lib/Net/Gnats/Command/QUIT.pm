@@ -1,6 +1,11 @@
 package Net::Gnats::Command::QUIT;
 use parent 'Net::Gnats::Command';
 use strictures;
+BEGIN {
+  $Net::Gnats::VERSION = '0.15';
+}
+use vars qw($VERSION);
+
 use Net::Gnats::Constants qw(CODE_CLOSING);
 
 =head1 NAME

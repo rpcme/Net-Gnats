@@ -1,5 +1,9 @@
 package Net::Gnats::FieldInstance;
 use strictures;
+BEGIN {
+  $Net::Gnats::VERSION = '0.15';
+}
+use vars qw($VERSION);
 
 sub new {
   my ($class, %options) = @_;

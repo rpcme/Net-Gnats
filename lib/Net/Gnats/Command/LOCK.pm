@@ -1,6 +1,11 @@
 package Net::Gnats::Command::LOCK;
 use parent 'Net::Gnats::Command';
 use strictures;
+BEGIN {
+  $Net::Gnats::VERSION = '0.15';
+}
+use vars qw($VERSION);
+
 use Net::Gnats::Constants qw(CODE_CMD_ERROR CODE_PR_READY CODE_NONEXISTENT_PR CODE_LOCKED_PR);
 
 =head1 NAME

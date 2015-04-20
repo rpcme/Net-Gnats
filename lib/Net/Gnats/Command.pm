@@ -1,8 +1,13 @@
 package Net::Gnats::Command;
 use utf8;
 use strictures;
-use Net::Gnats::Response;
 
+BEGIN {
+  $Net::Gnats::VERSION = '0.15';
+}
+use vars qw($VERSION);
+
+use Net::Gnats::Response;
 use Net::Gnats::Command::ADMV;
 use Net::Gnats::Command::APPN;
 use Net::Gnats::Command::CHDB;

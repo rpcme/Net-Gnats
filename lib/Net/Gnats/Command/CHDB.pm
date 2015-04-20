@@ -1,6 +1,11 @@
 package Net::Gnats::Command::CHDB;
 use parent 'Net::Gnats::Command';
 use strictures;
+BEGIN {
+  $Net::Gnats::VERSION = '0.15';
+}
+use vars qw($VERSION);
+
 use Net::Gnats::Constants qw(CODE_OK CODE_NO_ACCESS CODE_INVALID_DATABASE);
 
 =head1 NAME

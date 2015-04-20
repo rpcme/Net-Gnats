@@ -1,6 +1,11 @@
 package Net::Gnats::Response;
 use v5.10.00;
 use strictures;
+BEGIN {
+  $Net::Gnats::VERSION = '0.15';
+}
+use vars qw($VERSION);
+
 use Net::Gnats qw(verbose_level);
 use Net::Gnats::Constants qw(LF CODE_TEXT_READY CODE_PR_READY);
 
@@ -30,7 +35,7 @@ Gnatsd. Enables an easier payload method.
 
 =head1 VERSION
 
-0.14
+0.15
 
 =head1 SYNOPSIS
 

@@ -1,6 +1,11 @@
 package Net::Gnats::Command::REPL;
 use parent 'Net::Gnats::Command';
 use strictures;
+BEGIN {
+  $Net::Gnats::VERSION = '0.15';
+}
+use vars qw($VERSION);
+
 use Net::Gnats::Constants qw(CODE_OK CODE_NONEXISTENT_PR CODE_INVALID_FIELD_NAME CODE_UNREADABLE_PR CODE_GNATS_LOCKED CODE_LOCKED_PR CODE_INVALID_FIELD_CONTENTS);
 
 =head1 NAME

@@ -1,6 +1,11 @@
 package Net::Gnats::Command::LKDB;
 use parent 'Net::Gnats::Command';
 use strictures;
+BEGIN {
+  $Net::Gnats::VERSION = '0.15';
+}
+use vars qw($VERSION);
+
 use Net::Gnats::Constants qw(CODE_OK CODE_CMD_ERROR CODE_GNATS_LOCKED);
 
 =head1 NAME
