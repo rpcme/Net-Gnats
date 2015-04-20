@@ -7,13 +7,13 @@ use Net::Gnats;
 
 use File::Basename;
 use lib dirname(__FILE__);
-use Net::Gnats::TestData::Gtdata qw(connect_standard);
+use Net::Gnats::TestData::Gtdata qw(connect_standard_wauth);
 
 my $module = Test::MockObject::Extends->new('IO::Socket::INET');
 $module->fake_new( 'IO::Socket::INET' );
 $module->set_true( 'print' );
 $module->set_series( 'getline',
-                     @{ connect_standard() },
+                     @{ connect_standard_wauth() },
                      "440 One database name required.\r\n",
                      "350 Bug database\r\n",
                      "350 Bug database\r\n",
@@ -21,7 +21,7 @@ $module->set_series( 'getline',
                      "417 No such database as `defaulter'\r\n",
                    );
 
-my $g = Net::Gnats::Session->new;
+my $g = Net::Gnats::Session->new(username => 'madmin', password => 'madmin');
 $g->gconnect;
 
 my $c_noname = Net::Gnats::Command->dbdesc();

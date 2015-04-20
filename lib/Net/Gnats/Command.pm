@@ -132,4 +132,9 @@ sub field {
   return $self->{field};
 }
 
+sub field_change_reason {
+  my ( $self, $value ) = @_;
+  return $self->{field};
+}
+
 1;

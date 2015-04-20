@@ -7,9 +7,7 @@ use Test::MockObject::Extends;
 use Net::Gnats;
 use Net::Gnats::Session;
 use lib dirname(__FILE__);
-use Net::Gnats::TestData::Gtdata qw(connect_standard);
-
-my @series = @{ connect_standard() };
+use Net::Gnats::TestData::Gtdata qw(connect_standard_wauth);
 
 Net::Gnats->verbose(1);
 Net::Gnats->verbose_level(1);
@@ -18,12 +16,12 @@ my $module = Test::MockObject::Extends->new('IO::Socket::INET');
 $module->fake_new( 'IO::Socket::INET' );
 $module->set_true( 'print' );
 $module->set_series( 'getline',
-                     @{ connect_standard() },
+                     @{ connect_standard_wauth() },
                      "211 CODE_SEND_PR\r\n",
                      "210 CODE_OK\r\n",
                    );
 
-my $g = Net::Gnats::Session->new;
+my $g = Net::Gnats::Session->new(username => 'madmin', password => 'madmin');
 $g->gconnect;
 
 # hydrate test prs

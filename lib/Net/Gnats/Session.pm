@@ -4,7 +4,7 @@ use strictures;
 use Net::Gnats qw(verbose_level);
 use IO::Socket::INET;
 use Net::Gnats::Command qw(user quit);
-use Net::Gnats::Constants qw(LF CODE_GREETING CODE_PR_READY CODE_SEND_PR CODE_SEND_TEXT CODE_INFORMATION);
+use Net::Gnats::Constants qw(LF CODE_GREETING CODE_PR_READY CODE_SEND_PR CODE_SEND_TEXT CODE_SEND_CHANGE_REASON CODE_INFORMATION);
 use Net::Gnats::Schema;
 
 $| = 1;
@@ -59,6 +59,15 @@ a change to the given database is made.
 sub database {
   my ($self, $value) = @_;
   $self->{database} = 'default' if not defined $self->{database};
+  if ( defined $value ) {
+    return $self->{database} if $self->{database} eq $value;
+    $self->{database} = $value if
+      $self->issue(Net::Gnats::Command->chdb( database => $value))
+      ->is_ok;
+
+    # initialize schema for changed database
+    $self->{schema} = Net::Gnats::Schema->new($self);
+  }
   return $self->{database};
 }
 
@@ -176,15 +185,27 @@ sub version { return shift->{version} }
 
 =head2 authenticate
 
+Return:
+
+0 if failue
+1 if success
+
 =cut
 
 sub authenticate {
   my ( $self ) = @_;
-  my $c = Net::Gnats::Command->user( username => $self->username,
-                                     password => $self->password );
-  $self->issue( $c );
+  my ($c);
+
+  $c = $self->issue(Net::Gnats::Command->user( username => $self->username,
+                                               password => $self->password ));
+  $self->{authenticated} = $c->is_ok;
+  return $self if not $c->is_ok;
+
+  $self->{schema} = Net::Gnats::Schema->new($self) if not defined $self->schema;
+
   _trace('AUTH: ' . $c->is_ok);
-  $self->{authenticated} = 1 if $c->is_ok;
+
+  $c->is_ok;
 }
 
 =head2 gconnect
@@ -217,7 +238,8 @@ sub gconnect {
 
   _trace('Connection response: ' . $response->as_string);
 
-  return $self if $response->code != CODE_GREETING;
+  return undef if not defined $response->code;
+  return undef if $response->code != CODE_GREETING;
 
   _trace('Is Connected.');
   $self->{connected} = 1;
@@ -237,9 +259,11 @@ sub gconnect {
 
   $self->authenticate if defined $self->{username} and defined $self->{password};
 
+  return $self if not $self->is_authenticated;
+
   return $self if $self->access eq 'none' or $self->access eq 'deny' or $self->access eq 'listdb';
 
-  $self->{schema} = Net::Gnats::Schema->new($self) unless $self->no_schema;
+#  $self->{schema} = Net::Gnats::Schema->new($self) unless $self->no_schema;
 
   return $self;
 }
@@ -253,6 +277,9 @@ Disconnects from the current session, either authenticated or not.
 sub disconnect {
   my ( $self ) = @_;
   $self->issue( Net::Gnats::Command->quit );
+  $self->{connected} = 0;
+  $self->{authenticated} = 0;
+  $self->{schema} = undef;
 }
 
 =head2 issue
@@ -273,15 +300,21 @@ sub issue {
   return $command if not defined $command->as_string;
 
   $command->response( $self->_run( $command->as_string ) );
-  # Check CODE_SEND_TEXT or CODE_SEND_PR
 
+  # In case we received the an undefined response code, return here.
+  # This could happen when the network response gets broken.
+  return $command if not defined $command->response->code;
+
+  # Check CODE_SEND_TEXT or CODE_SEND_PR
   # This will be a field object value.
   if ($command->response->code == CODE_SEND_TEXT) {
-    $command->response( $self->_run( $command->field->value ) );
+    $command->response( $self->_run( $command->field->value . "\n." ) );
+    $command->response( $self->_run( $command->field_change_reason->value . "\n." ))
+      if $command->response->code == CODE_SEND_CHANGE_REASON;
   }
   # This will be a whole serialized PR.
   elsif ($command->response->code == CODE_SEND_PR) {
-    $command->response( $self->_run( $command->pr ) );
+    $command->response( $self->_run( $command->pr  . "\n." ) );
   }
   return $command;
 }
@@ -337,8 +370,14 @@ sub _read {
 
   until ( $response->is_finished == 1 ) {
     my $line = $self->_read_clean($self->{gsock}->getline);
-    _trace('RECV: [' . $line . ']');
+
+    # We didn't get anyting from the socket, it could mean a broken
+    # connection or malformed response.
+    last if not defined $line;
+
+    # Process the line normally.
     $response->raw( $line );
+    _trace('RECV: [' . $line . ']');
   }
   return $response;
 }

@@ -7,13 +7,13 @@ use Net::Gnats;
 
 use File::Basename;
 use lib dirname(__FILE__);
-use Net::Gnats::TestData::Gtdata qw(connect_standard);
+use Net::Gnats::TestData::Gtdata qw(connect_standard_wauth);
 
 my $module = Test::MockObject::Extends->new('IO::Socket::INET');
 $module->fake_new( 'IO::Socket::INET' );
 $module->set_true( 'print' );
 $module->set_series( 'getline',
-                     @{ connect_standard() },
+                     @{ connect_standard_wauth() },
                      "351-The current user access level is:\r\n",
                      "350 admin\r\n",
                      "210-Now accessing GNATS database 'default'\r\n",
@@ -21,7 +21,7 @@ $module->set_series( 'getline',
                      "422 CODE_NO_ACCESS\r\n",
                    );
 
-my $g = Net::Gnats::Session->new->gconnect;
+my $g = Net::Gnats::Session->new(username => 'madmin', password => 'madmin')->gconnect;
 
 my $c1 = Net::Gnats::Command->user; #ok
 my $c2 = Net::Gnats::Command->user(username => 'foo'); #bad

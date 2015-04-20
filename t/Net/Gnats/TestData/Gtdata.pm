@@ -2,7 +2,7 @@ package Net::Gnats::TestData::Gtdata;
 require Exporter;
 use parent 'Exporter';
 
-@EXPORT_OK = qw(schema1 connect_standard conn_bad user);
+@EXPORT_OK = qw(schema1 connect_standard connect_standard_wauth conn_bad user conn);
 
 my $LF = chr 10; # 0x0A
 my $CR = chr 13; # 0x0D
@@ -20,6 +20,17 @@ sub connect_standard {
   return \@d;
 }
 
+sub connect_standard_wauth {
+  my @d = qw();
+  push @d,
+    @{ conn() },
+    @{ user() },
+    @{ user_wauth()},
+    @{ schema1() }
+    ;
+  return \@d;
+}
+
 sub connect_badversion {
   my @d = qw();
   push @d,
@@ -33,6 +44,11 @@ sub connect_badversion {
 sub user {
   return ["351-The current user access level is:\r\n",
           "350 admin\r\n",];
+}
+
+sub user_wauth {
+  return ["210-Now accessing GNATS database 'default'\r\n",
+          "210 User access level set to 'admin'\r\n",];
 }
 
 sub conn {

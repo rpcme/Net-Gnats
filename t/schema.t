@@ -12,18 +12,23 @@ Net::Gnats->verbose_level(1);
 
 use File::Basename;
 use lib dirname(__FILE__);
-use Net::Gnats::TestData::Gtdata qw(connect_standard);
+use Net::Gnats::TestData::Gtdata qw(connect_standard conn user schema1);
 
 my $module = Test::MockObject::Extends->new('IO::Socket::INET');
 $module->fake_new( 'IO::Socket::INET' );
 $module->set_true( 'print' );
 $module->set_series( 'getline',
-                     @{ connect_standard() },
+                     @{ conn() },
+                     @{ user() },
+                     "210-Now accessing GNATS database 'default'\r\n",
+                     "210 User access level set to 'admin'\r\n",
+                     @{ schema1() }
                    );
 
 my $g = Net::Gnats->new();
 print "Connecting\n";
 $g->gnatsd_connect;
+$g->login('default', 'madmin', 'madmin');
 
 # initialize new schema
 print "init schema\n";

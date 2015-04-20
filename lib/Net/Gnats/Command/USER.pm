@@ -75,6 +75,7 @@ sub level {
 sub is_ok {
   my ($self) = @_;
   return 0 if not defined $self->response;
+  return 0 if not defined $self->response->code;
   return 0 if $self->response->code == CODE_NO_ACCESS;
   return 1;
 }

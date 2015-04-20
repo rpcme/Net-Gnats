@@ -7,19 +7,19 @@ use Net::Gnats;
 
 use File::Basename;
 use lib dirname(__FILE__);
-use Net::Gnats::TestData::Gtdata qw(connect_standard);
+use Net::Gnats::TestData::Gtdata qw(connect_standard_wauth);
 
 my $module = Test::MockObject::Extends->new('IO::Socket::INET');
 $module->fake_new( 'IO::Socket::INET' );
 $module->set_true( 'print' );
 $module->set_series( 'getline',
-                     @{ connect_standard() },
+                     @{ connect_standard_wauth() },
                      "440 CODE_CMD_ERROR\r\n",
                      "210 PR 5 unlocked.\r\n",
                      "433 CODE_PR_NOT_LOCKED\r\n",
                    );
 
-my $g = Net::Gnats::Session->new();
+my $g = Net::Gnats::Session->new(username => 'madmin', password => 'madmin');
 $g->gconnect;
 
 # this method just requires and ID when in fact it _should_ be a PR

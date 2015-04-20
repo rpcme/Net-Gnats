@@ -51,7 +51,9 @@ sub new {
 
 sub as_string {
   my $self = shift;
-  return $c . join (' ' . @{ $self->{pr_numbers}} );
+  return $c . ' ' . join ' ', @{ $self->{pr_numbers}}
+    if ( scalar @{$self->{pr_numbers}} != 0);
+  return $c;
 }
 
 sub is_ok {

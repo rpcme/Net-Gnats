@@ -41,22 +41,11 @@ sub new {
   return bless \%o, $class;
 }
 
-sub name {
-  my ( $self, $value ) = @_;
-  $self->{name} = $value if defined $value;
-  $self->{name};
-}
-
-sub description {
-  my ( $self, $value ) = @_;
-  $self->{description} = $value if defined $value;
-  $self->{description};
-}
-
-sub type {
-  my ( $self, $value ) = @_;
-  $self->{type} = $value if defined $value;
-  $self->{type};
+sub change_reason_field {
+  my ($self) = @_;
+  return undef if not $self->requires_change_reason;
+  $self->_create_change_reason if not defined $self->{change_reason};
+  return $self->{change_reason};
 }
 
 sub default {
@@ -65,10 +54,33 @@ sub default {
   $self->{default};
 }
 
+sub description {
+  my ( $self, $value ) = @_;
+  $self->{description} = $value if defined $value;
+  $self->{description};
+}
+
 sub flags {
   my ( $self, $value ) = @_;
   $self->{flags} = $value if defined $value;
   $self->{flags};
+}
+
+sub name {
+  my ( $self, $value ) = @_;
+  $self->{name} = $value if defined $value;
+  $self->{name};
+}
+
+sub requires_change_reason {
+  return 1 if shift->flags =~ /requireChangeReason/;
+  return 0;
+}
+
+sub type {
+  my ( $self, $value ) = @_;
+  $self->{type} = $value if defined $value;
+  $self->{type};
 }
 
 sub validators {
@@ -96,6 +108,15 @@ Creates an instance of this meta field.  Represents a literal field in a PR.
 sub instance {
   my $self = shift;
   return Net::Gnats::FieldInstance->new( schema => $self, name => $self->name );
+}
+
+sub _create_change_reason {
+  my ($self) = @_;
+  my $f = Net::Gnats::Field->new;
+  $f->name($self->name . '-Changed-Why');
+  $f->description($self->description . ' - Reason for Change');
+  $f->type('multiText');
+  $self->{change_reason} = $f;
 }
 
 1;

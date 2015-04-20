@@ -34,8 +34,6 @@ our $REVISION = '$Id: PR.pm,v 1.8 2014/08/16 23:40:56 thacker Exp $'; #'
 sub new {
   my ( $class, %options ) = @_;
   my $self = bless {}, $class;
-
-    #    $self->{__gnatsObj} = $gnatsobj;
   $self->{number} = undef;
   $self->{fieldlist} = [];
   return $self if not %options;
@@ -52,25 +50,73 @@ sub add_field {
   return;
 }
 
-
 sub get_field {
   my ($self, $fieldname) = @_;
   return $self->{fields}->{$fieldname} if defined $self->{fields}->{$fieldname};
   return undef;
 }
 
-=head2 setField()
+=head2 replaceField
 
-Sets a gnats field value.  Expects two arguments: the field name followed by
-the field value.
+Sets a new value for an existing field.
+
+If the field requires a Change Reason, and the field does not exist in
+the PR, then the FieldInstance for the Change Reason is created.
+
+Returns 0 if the field does not exist.
+
+Returns 0 if the field requires a changeReason, but one was not provided.
+
+Returns 0 if the change did not occur successfully.
+
+Returns 1 if the field is set and flushed to Gnats.
+
+=cut
+
+sub replaceField {
+  my ($self, $name, $value, $reason_value) = @_;
+  return 0 if not defined $self->get_field($name);
+  return 0 if not $self->setField($name, $value, $reason_value);
+
+  my $f = $self->get_field($name);
+
+  if ($f->schema->requires_change_reason) {
+    return Net::Gnats
+        ->current_session
+        ->issue(Net::Gnats::Command->repl(pr_number => $self->get_field('Number')->value,
+                                          field => $f,
+                                          field_change_reason => $self->get_field($name . '-Changed-Why')))->is_ok;
+  }
+  return Net::Gnats
+    ->current_session
+    ->issue(Net::Gnats::Command->repl(pr_number => $self->get_field('Number')->value,
+                                      field => $f))->is_ok;
+}
+
+
+=head2 setField
+
+Sets a gnats field value.  Expects two arguments: the field name
+followed by the field value.  If the field requires a change reason,
+provide it as a third argument.
 
 =cut
 
 sub setField {
-    my ($self, $field, $value, $reason) = @_;
-    $self->{fields}->{$field}->value($value);
-    $self->{fields}->{$field . '-Changed-Why'}->value($reason)
-      if (defined($reason)); # TODO: Anyway to find out if requireChangeReason?
+  my ($self, $name, $value, $reason_value) = @_;
+  return 0 if not defined $self->get_field($name);
+  my $f = $self->get_field($name);
+
+  if ($f->schema->requires_change_reason) {
+    return 0 if (not defined $reason_value);
+    my $cr_instance =
+      Net::Gnats::FieldInstance->new(schema => $f->schema->change_reason_field);
+    $cr_instance->value($reason_value);
+    $self->add_field($cr_instance);
+  }
+
+  $f->value($value);
+  return 1;
 }
 
 =head2 getField
@@ -139,7 +185,8 @@ is suitable for submitting to Gnats.
 
 sub asString {
   my $self = shift;
-  return $self->unparse(@_);
+  return Net::Gnats::PR->serialize($self,
+                                   Net::Gnats->current_session->username);
 }
 
 # Split comma-separated list.
@@ -266,9 +313,18 @@ Deserializes a PR from Gnats and returns a hydrated PR.
                                       schema => $s->schema);
 
 =cut
+sub setFromString {
+  my ($self, $data) = @_;
+  # expects just a block of text, so we need to break it out
+  $data =~ s/\r//g;
+  my @lines = split /\n/, $data;
+  return Net::Gnats::PR->deserialize(data => \@lines,
+                                     schema => Net::Gnats->current_session->schema);
+}
 
 sub deserialize {
   my ($self, %options)  = @_;
+
   my $data = $options{data};
   my $schema = $options{schema};
 
@@ -407,7 +463,7 @@ sub serialize {
       $tmp =~ s/\r//;
       $tmp =~ s/^[.]/../gm;
       chomp($tmp);
-      $text .= sprintf(">$_:\n%s\n", $tmp);
+      $text .= sprintf(">%s:\n%s\n", $field->name, $tmp);
     }
     else {
       # Format string derived from gnats/pr.c.

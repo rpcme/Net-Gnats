@@ -7,13 +7,13 @@ use Net::Gnats;
 
 use File::Basename;
 use lib dirname(__FILE__);
-use Net::Gnats::TestData::Gtdata qw(connect_standard);
+use Net::Gnats::TestData::Gtdata qw(connect_standard_wauth);
 
 my $module = Test::MockObject::Extends->new('IO::Socket::INET');
 $module->fake_new( 'IO::Socket::INET' );
 $module->set_true( 'print' );
 $module->set_series( 'getline',
-                     @{ connect_standard() },
+                     @{ connect_standard_wauth() },
                      "301 Valid values follow.\r\n",
                      ".\r\n",
                      "301 Valid values follow.\r\n",
@@ -28,7 +28,7 @@ $module->set_series( 'getline',
                      ".\r\n",
                    );
 
-my $g = Net::Gnats::Session->new;
+my $g = Net::Gnats::Session->new(username => 'madmin', password => 'madmin');
 isa_ok $g->gconnect, 'Net::Gnats::Session';
 
 my $c1 = Net::Gnats::Command->fvld;

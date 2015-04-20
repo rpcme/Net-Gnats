@@ -8,7 +8,7 @@ sub new {
 
 sub name {
   my ($self) = @_;
-  $self->{name} = $self->schema->name if not defined $self->{value};
+  $self->{name} = $self->schema->name if not defined $self->{name};
   $self->{name};
 }
 

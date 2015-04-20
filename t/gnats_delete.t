@@ -7,13 +7,16 @@ use Net::Gnats;
 
 use File::Basename;
 use lib dirname(__FILE__);
-use Net::Gnats::TestData::Gtdata qw(connect_standard);
+use Net::Gnats::TestData::Gtdata qw(connect_standard_wauth conn user);
 
 my $module = Test::MockObject::Extends->new('IO::Socket::INET');
 $module->fake_new( 'IO::Socket::INET' );
 $module->set_true( 'print' );
 $module->set_series( 'getline',
-                     @{ connect_standard() },
+                     @{ conn() },
+                     @{ user() },
+                     "210-Now accessing GNATS database 'default'\r\n",
+                     "210 User access level set to 'admin'\r\n",
                      "210 PR 2 deleted.\r\n",
                      "600 CODE_CMD_ERROR\r\n",
                      "440 CODE_CMD_ERROR\r\n",

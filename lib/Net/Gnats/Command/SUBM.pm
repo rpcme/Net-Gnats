@@ -52,9 +52,10 @@ sub as_string {
 
 sub is_ok {
   my ($self) = @_;
-  # returned undef because command could not be run
+  # command not run yet
   return 0 if not defined $self->response;
-
+  # malformed response
+  return 0 if not defined $self->response->code;
   return 1 if $self->response->code == CODE_INFORMATION;
   return 0;
 }

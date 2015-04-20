@@ -8,18 +8,18 @@ use Net::Gnats;
 
 use File::Basename;
 use lib dirname(__FILE__);
-use Net::Gnats::TestData::Gtdata qw(connect_standard);
+use Net::Gnats::TestData::Gtdata qw(connect_standard_wauth);
 
 my $module = Test::MockObject::Extends->new('IO::Socket::INET');
 $module->fake_new( 'IO::Socket::INET' );
 $module->set_true( 'print' );
 $module->set_series( 'getline',
-                     @{ connect_standard() },
+                     @{ connect_standard_wauth() },
                      "212 Ok, send field text now.\r\n",
                      "210 Ok.\r\n",
                    );
 
-my $g = Net::Gnats::Session->new->gconnect;
+my $g = Net::Gnats::Session->new(username => 'madmin', password => 'madmin')->gconnect;
 my $field = Net::Gnats::FieldInstance->new( name => 'foo', value => 'bar' );
 
 my $c1 = Net::Gnats::Command->vfld;

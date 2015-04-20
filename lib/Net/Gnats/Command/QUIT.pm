@@ -41,6 +41,7 @@ sub as_string {
 sub is_ok {
   my ($self) = @_;
   return 0 if not defined $self->response;
+  return 0 if not defined $self->response->code;
   return 1 if $self->response->code == CODE_CLOSING;
   return 0;
 }

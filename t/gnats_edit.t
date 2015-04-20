@@ -7,19 +7,19 @@ use Net::Gnats;
 
 use File::Basename;
 use lib dirname(__FILE__);
-use Net::Gnats::TestData::Gtdata qw(connect_standard);
+use Net::Gnats::TestData::Gtdata qw(connect_standard_wauth);
 
 my $module = Test::MockObject::Extends->new('IO::Socket::INET');
 $module->fake_new( 'IO::Socket::INET' );
 $module->set_true( 'print' );
 $module->set_series( 'getline',
-                     @{ connect_standard() },
+                     @{ connect_standard_wauth() },
                      "210 CODE_OK\r\n",
                      # No response, should not be sent
                      # No response, should not be sent
                    );
 
-my $g = Net::Gnats::Session->new;
+my $g = Net::Gnats::Session->new(username => 'madmin', password => 'madmin');
 $g->gconnect;
 
 # EDIT requires a PR, so hydrate.

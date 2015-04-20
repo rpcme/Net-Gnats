@@ -12,6 +12,8 @@ else {
 
 use Net::Gnats;
 #Net::Gnats::debug_gnatsd;
+Net::Gnats->verbose(1);
+Net::Gnats->verbose_level(1);
 
 my $conn1 = {
              server   => 'localhost',
@@ -32,7 +34,7 @@ is($g->login($conn1->{db},
              $conn1->{username},
              $conn1->{password}), 1, "Login is OK");
 
-ok(defined $g->listDatabases(), "Can list databases from gnatsd");
+ok(defined $g->list_databases(), "Can list databases from gnatsd");
 ok($g->get_dbnames, 'get_dbnames');
 ok($g->list_databases, 'list_databases');
 ok($g->list_categories, 'list_categories');
@@ -42,16 +44,16 @@ ok($g->list_states, 'list_states');
 ok($g->list_fieldnames, 'list_fieldnames');
 ok($g->list_inputfields_initial, 'list_inputfields_initial');
 
-is($g->get_field_typeinfo('Originator'), undef, 'get_field_typeinfo - bad arg');
+is($g->get_field_type_info('Originator'), 'Property `separators\' not defined for field type `Text\'.', 'get_field_type_info - bad arg');
 # Note typeinfo req MultiEnum so if the field's not MultiEnum, you get undef
-is($g->get_field_typeinfo('Originator', 'separators'), undef, 'get_field_typeinfo');
+is($g->get_field_type_info('Originator', 'separators'), 'Property `separators\' not defined for field type `Text\'.', 'get_field_type_info');
 # TODO : Find MultiEnum field to test this
 #ok($g->get_field_typeinfo('State', 'separators'), 'get_field_typeinfo');
 
 ok(defined $g->get_field_desc('Originator'), 'get_field_desc');
 ok(defined $g->get_field_flags('Originator'), 'get_field_flags');
 
-is($g->get_field_type, undef, 'get_field_type - bad arg');
+is($g->get_field_type, 0, 'get_field_type - bad arg');
 ok(defined $g->get_field_type('Responsible'), 'get_field_type');
 
 
@@ -72,16 +74,18 @@ $pr1->setField('Synopsis','Some bug from perlgnats');
   # $newPR->setField("How-To-Repeat","Like this.  Like this.");
   # $newPR->setField("Fix","Who knows");
 
-is($g->validate_field('BADFIELD', 'noop'), undef, 'VFLD fail');
-is($g->validate_field('Priority', 'BAD'), undef, 'VFLD Value fail');
-is($g->validate_field('Priority', 'low'), 1, 'VFLD Value pass');
+is($g->validate_field(Net::Gnats::FieldInstance->new(name => 'BADFIELD', value => 'noop')), 0, 'VFLD fail');
+is($g->validate_field(Net::Gnats::FieldInstance->new(name => 'Priority', value => 'BAD')), 0, 'VFLD Value fail');
+is($g->validate_field(Net::Gnats::FieldInstance->new(name => 'Priority', value => 'low')), 1, 'VFLD Value pass');
 
 
-my $pr1_result = join "\n", @{ $g->submit_pr($pr1) };
-ok($pr1_result > 0, 'we have a pr');
+isa_ok my $num5 = $g->get_pr_by_number(5), 'Net::Gnats::PR';
+is $num5->get_field('Number')->value, 5, 'number field is 5';
+
+is $g->submit_pr($pr1), 1, 'we have a pr';
 
 
-my $pr2 = $g->get_pr_by_number($pr1_result);
+my $pr2 = $g->get_pr_by_number($pr1->get_field('Number')->value);
 
 $pr2->setField('Synopsis', 'changing you');
 $g->update_pr($pr2);
