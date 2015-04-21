@@ -39,6 +39,7 @@ lib/Net/Gnats/Session.pm
 LICENSE
 Makefile.PL
 MANIFEST			This list of files
+README
 t/01_constants1.t
 t/02_sessions.t
 t/03_documentation.t
@@ -57,7 +58,6 @@ t/gnats_fieldflags.t
 t/gnats_ftyp.t
 t/gnats_ftypinfo.t
 t/gnats_fvld.t
-t/gnats_general.t
 t/gnats_inputdefault.t
 t/gnats_list.t
 t/gnats_lkdb.t
@@ -81,4 +81,3 @@ t/regress_11.t
 t/regress_8.t
 t/response.t
 t/schema.t
-t/test.t

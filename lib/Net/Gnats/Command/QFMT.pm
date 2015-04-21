@@ -2,7 +2,7 @@ package Net::Gnats::Command::QFMT;
 use parent 'Net::Gnats::Command';
 use strictures;
 BEGIN {
-  $Net::Gnats::VERSION = '0.15';
+  $Net::Gnats::VERSION = '0.16';
 }
 use vars qw($VERSION);
 
