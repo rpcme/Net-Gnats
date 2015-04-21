@@ -2,7 +2,7 @@ package Net::Gnats::Session;
 use v5.10.00;
 use strictures;
 BEGIN {
-  $Net::Gnats::VERSION = '0.16';
+  $Net::Gnats::VERSION = '0.17';
 }
 use vars qw($VERSION);
 
@@ -22,12 +22,20 @@ Net::Gnats::Session
 
 Represents a specific connection to Gnats.
 
+When constructing a new session, it resets $Net::Gnats::current_session.
+
 =cut
 
 sub new {
   my ($class, %o ) = @_;
-  return bless {}, $class if not %o;
-  return bless \%o, $class;
+  my ($self);
+  $self = bless {}, $class if not %o;
+  $self = bless \%o, $class;
+
+  #set the current session to Net::Gnats so we can ref it throughout
+  Net::Gnats->current_session($self);
+
+  return $self;
 }
 
 =head1 ACCESSORS

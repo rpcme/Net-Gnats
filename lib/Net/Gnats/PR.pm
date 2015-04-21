@@ -4,7 +4,7 @@ use utf8;
 use strictures;
 
 BEGIN {
-  $Net::Gnats::VERSION = '0.16';
+  $Net::Gnats::VERSION = '0.17';
 }
 use vars qw($VERSION);
 
@@ -34,6 +34,19 @@ our $REVISION = '$Id: PR.pm,v 1.8 2014/08/16 23:40:56 thacker Exp $'; #'
 # Args: hash (parameter list)
 # Returns: self
 #******************************************************************************
+
+=head1 CONSTRUCTOR
+
+=head2 new
+
+The new() constructor does not expect any options.  However, this may
+change in the future when PR initialization is moved from Net::Gnats
+to this class.
+
+ my $pr = Net::Gnats::PR->new
+
+=cut
+
 sub new {
   my ( $class, %options ) = @_;
   my $self = bless {}, $class;
@@ -42,6 +55,94 @@ sub new {
   return $self if not %options;
   return $self;
 }
+
+
+=head1 ACCESSORS
+
+=head2 asHash
+
+Returns the PR formatted as a hash.  The returned hash contains field
+names as keys, and the corresponding field values as hash values.
+
+CHANGE ALERT: This method now returns all FieldInstance objects.
+
+DEPRECATION NOTICE: This accessor will be removed in the near future.
+
+=cut
+
+sub asHash {
+    my ( $self ) = shift;
+    return %{$self->{fields}} if defined($self->{fields}); #XXX Deep copy?
+    return undef;
+}
+
+=head2 asString
+
+Returns the PR object formatted as a Gnats recongizable string.  The
+result is suitable for submitting to Gnats.
+
+ my $serialized_pr = $pr->asString;
+
+DEPRECATION NOTICE: This accessor will be removed in the near future.
+Instead, use:
+
+ my $serialized_pr = $pr->serialize;
+
+=cut
+
+sub asString {
+  my $self = shift;
+  return Net::Gnats::PR->serialize($self,
+                                   Net::Gnats->current_session->username);
+}
+
+=head2 getField
+
+Returns the string value of a PR field.
+
+ $pr->getField('field');
+
+DEPRECATION NOTICE: this will be deprecated in the near future.  Use instead:
+
+ $r->get_field('field')->value
+
+=cut
+
+sub getField {
+    my ( $self, $field ) = @_;
+    return $self->{fields}->{$field}->value;
+}
+
+=head2 getKeys
+
+Returns the list of PR fields contained in the object.
+
+=cut
+
+sub getKeys {
+    return keys %{shift->{fields}};
+}
+
+=head2 getNumber
+
+Returns the gnats PR number. In previous versions of gnatsperl the
+Number field was explicitly known to Net::Gnats::PR.  This method
+remains for backwards compatibility.
+
+DEPRECATION NOTICE: this will be deprecated in the near future.  Use
+instead:
+
+ $r->get_field('Number')->value
+
+=cut
+
+sub getNumber {
+  return shift->{fields}->{'Number'}->value;
+}
+
+=head1 METHODS
+
+=cut
 
 sub add_field {
   my ($self, $field) = @_;
@@ -122,74 +223,51 @@ sub setField {
   return 1;
 }
 
-=head2 getField
+=head2 submit
 
-Returns the string value of a PR field.
+Submit this PR to Gnats.  It uses the currently active session to
+perform the submit.
 
- $pr->getField('field');
+ $pr = $pr->submit;
 
-DEPRECATION NOTICE: this will be deprecated in the near future.  Use instead:
+After a successful submit, the PR with the PR Number is returned.
 
- $r->get_field('field')->value
+ say 'My new number is: ' . $pr->get_field('Number')->value;
 
-=cut
+By default, submit will not send a PR which already has a PR Number.
+If your intent is to create a new PR based on this one, use the force
+option (may change in the future).  This is useful when a series of
+similar PRs need to be submitted.
 
-sub getField {
-    my ( $self, $field ) = @_;
-    return $self->{fields}->{$field}->value;
-}
+ $pr = $pr->submit(1);
 
-=head2 getNumber()
-
-Returns the gnats PR number. In previous versions of gnatsperl the Number field was
-explicitly known to Net::Gnats::PR.  This method remains for backwards compatibility.
-
-DEPRECATION NOTICE: this will be deprecated in the near future.  Use instead:
-
- $r->get_field('Number')->value
+If the PR submission based on force was not successful, the PR will
+return with the same PR Number.
 
 =cut
 
-sub getNumber {
-  return shift->{fields}->{'Number'}->value;
-}
+sub submit {
+  my ($self, $force) = @_;
 
-=head2 getKeys
+  return $self if defined $self->get_field('Number') and not defined $force;
 
-Returns the list of PR fields contained in the object.
+  my $command = Net::Gnats
+      ->current_session
+      ->issue(Net::Gnats::Command->subm(pr => $self));
+  return $self if $command->is_ok == 0;
 
-=cut
-
-sub getKeys {
-    return keys %{shift->{fields}};
-}
-
-=head2 asHash
-
-Returns the PR formatted as a hash.  The returned hash contains field names
-as keys, and the corresponding field values as hash values.
-
-CHANGE ALERT: This method now returns all FieldInstance objects.
-
-=cut
-
-sub asHash {
-    my ( $self ) = shift;
-    return %{$self->{fields}} if defined($self->{fields}); #XXX Deep copy?
-    return undef;
-}
-
-=head2 asString
-
-Returns the PR object formatted as a Gnats recongizable string.  The result
-is suitable for submitting to Gnats.
-
-=cut
-
-sub asString {
-  my $self = shift;
-  return Net::Gnats::PR->serialize($self,
-                                   Net::Gnats->current_session->username);
+  # the number is in the second response item.  This should probably be in SUBM.pm.
+  my $number = @{ $command->response->as_list }[1];
+  if ( $self->get_field('Number') ) {
+    $self->get_field('Number')->value($number);
+  }
+  else {
+    my $field_schema = Net::Gnats->current_session->schema->field('Number');
+    $self->add_field(Net::Gnats::FieldInstance->new( name => 'Number',
+                                                     value => $number,
+                                                     schema => $field_schema ));
+  }
+  return $self;
 }
 
 # Split comma-separated list.
@@ -556,24 +634,6 @@ Value' format.  You can see this more clearly by looking at the PR
 files of your Gnats installation).  This is useful when handling a
 Gnats email submission ($newPR->setFromString($email)) or when reading
 a PR file directly from the database.
-
-
-=head1 METHOD DESCRIPTIONS
-
-
-=head2 new()
-
-Constructor, no arguments.
-
-
-
-
-
-
-
-
-
-
 
 =head1 BUGS
 

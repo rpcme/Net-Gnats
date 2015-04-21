@@ -1,6 +1,6 @@
 package Net::Gnats;
 BEGIN {
-  $Net::Gnats::VERSION = '0.16';
+  $Net::Gnats::VERSION = '0.17';
 }
 use 5.010_000;
 use utf8;
@@ -240,6 +240,8 @@ Retrieves the currently used session (last initialized).
 =cut
 
 sub current_session {
+  my ($self, $session) = @_;
+  $current_session = $session if defined $session;
   return $current_session;
 }
 
@@ -817,6 +819,13 @@ sub append_field_content {
 
 Expect a Gnats::PR object as sole argument, and issues the SUMB
 command.  Returns true if PR successfully submitted, false otherwise.
+
+DEPRECATION NOTICE: This method will be deprecated soon.  Please be
+aware that you can submit a PR from a PR object.
+
+ $pr = $pr->submit;
+
+And $pr will contain the new PR number.  See PR.pm for details.
 
 =cut
 
