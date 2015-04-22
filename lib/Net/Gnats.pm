@@ -946,6 +946,8 @@ sub qfmt {
 Expects one or more query expressions as argument(s).  Returns an
 anonymous array of PR numbers.
 
+If there is an error, then it will return an empty set.
+
 =cut
 
 sub query {
