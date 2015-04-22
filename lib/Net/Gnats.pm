@@ -1,6 +1,6 @@
 package Net::Gnats;
 BEGIN {
-  $Net::Gnats::VERSION = '0.17';
+  $Net::Gnats::VERSION = '0.18';
 }
 use 5.010_000;
 use utf8;
