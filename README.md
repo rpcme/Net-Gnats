@@ -8,7 +8,11 @@ Repository for the Net::Gnats module.
 
 Version
 -------
-The current version is 0.16.
+The current version is 0.18.
+
+Changes in 0.17
+---------------
+Added ability to submit a PR from a PR object.
 
 Changes in 0.16
 ---------------
