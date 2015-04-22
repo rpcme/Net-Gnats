@@ -424,7 +424,7 @@ sub list_states {
                        )->formatted;
 }
 
-=item list_fieldnames
+=head2 list_fieldnames
 
 Issues the LIST FIELDNAMES command, and returns a list of hashrefs
 with key 'name'.
