@@ -51,8 +51,8 @@ $module->set_series( 'getline',
 my $g = Net::Gnats->new();
 $g->gnatsd_connect;
 $g->login('default', 'madmin','madmin');
-is $g->query, 0, 'No PRs Matched';
-is $g->query, 0, 'Invalid query format';
+is_deeply $g->query, [], 'No PRs Matched';
+is_deeply $g->query, [], 'Invalid query format';
 is_deeply $g->query, [45], 'One PR';
 is_deeply $g->query, [45,46], 'Two PRs';
 
