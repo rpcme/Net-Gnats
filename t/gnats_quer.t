@@ -9,10 +9,8 @@ use File::Basename;
 use lib dirname(__FILE__);
 use Net::Gnats::TestData::Gtdata qw(connect_standard user conn schema1);
 
-
 Net::Gnats->verbose(1);
 Net::Gnats->verbose_level(1);
-
 
 my $module = Test::MockObject::Extends->new('IO::Socket::INET');
 $module->fake_new( 'IO::Socket::INET' );

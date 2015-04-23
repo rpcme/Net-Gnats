@@ -30,6 +30,7 @@ my $pr1 = Net::Gnats::PR->deserialize(data => pr1(), schema => $g->schema);
 
 isa_ok my $a = Net::Gnats::Command::CHEK->new, 'Net::Gnats::Command::CHEK';
 isa_ok my $b = Net::Gnats::Command::CHEK->new( type => 'initial', pr => $pr1 ), 'Net::Gnats::Command::CHEK';
+isa_ok my $c = Net::Gnats::Command->chek( type => 'initial', pr => $pr1 ), 'Net::Gnats::Command::CHEK';
 
 is $a->as_string, 'CHEK', 'CHEK with no type';
 is $b->as_string, 'CHEK initial', 'CHEK with type';

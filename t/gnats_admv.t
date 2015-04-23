@@ -23,8 +23,9 @@ my $g = Net::Gnats::Session->new(no_schema => 1);
 isa_ok $g->gconnect, 'Net::Gnats::Session';
 
 isa_ok my $a = Net::Gnats::Command::ADMV->new, 'Net::Gnats::Command::ADMV';
-isa_ok my $b = Net::Gnats::Command::ADMV->new( field => 'foo',
+isa_ok my $b = Net::Gnats::Command::ADMV->new( field_name => 'foo',
                                                key => 'bar'), 'Net::Gnats::Command::ADMV';
+isa_ok my $c = Net::Gnats::Command->admv, 'Net::Gnats::Command::ADMV';
 
 is $b->as_string, 'ADMV foo bar';
 
