@@ -7,7 +7,7 @@ use Net::Gnats;
 
 use File::Basename;
 use lib dirname(__FILE__);
-use Net::Gnats::TestData::Gtdata qw(connect_standard_wauth);
+use Net::Gnats::TestData::Gtdata qw(connect_standard_wauth conn user schema1);
 
 
 my $module = Test::MockObject::Extends->new('IO::Socket::INET');
@@ -15,6 +15,89 @@ $module->fake_new( 'IO::Socket::INET' );
 $module->set_true( 'print' );
 $module->set_series( 'getline',
                      @{ connect_standard_wauth() },
+                     #category
+                     "301 List follows.\r\n",
+                     "cat1:cat1 desc:joe:mark\r",
+                     ".\r\n",
+                     #submitters
+                     "301 List follows.\r\n",
+                     "sub1:Sub long name:my contract:2:jimmy:joe, bob\r",
+                     ".\r\n",
+                     #responsible
+                     "301 List follows.\r\n",
+                     "bob:Bobby Boy:bobby\@whodunit.gov\r",
+                     ".\r\n",
+                     #state
+                     "301 List follows.\r\n",
+                     "closed::really closed",
+                     "analyzed:deeply:This was analyzed deeply.\r",
+                     ".\r\n",
+                     #fieldnames
+                     "301 List follows.\r\n",
+                     "field1\r",
+                     "field2\r",
+                     ".\r\n",
+                     #initialinput
+                     "301 List follows.\r\n",
+                     "field1\r",
+                     "field2\r",
+                     ".\r\n",
+                     #initialrequired
+                     "301 List follows.\r\n",
+                     "field1\r",
+                     "field2\r",
+                     ".\r\n",
+                     #databases
+                     "301 List follows.\r\n",
+                     "db1:db1 desc:/path/to/db1\r",
+                     "db2:db2 desc:/path/to/db2\r",
+                     ".\r\n",
+                     #category
+                     "301 List follows.\r\n",
+                     "cat1:cat1 desc:joe:mark\r",
+                     ".\r\n",
+                     #submitters
+                     "301 List follows.\r\n",
+                     "sub1:Sub long name:my contract:2:jimmy:joe, bob\r",
+                     ".\r\n",
+                     #responsible
+                     "301 List follows.\r\n",
+                     "bob:Bobby Boy:bobby\@whodunit.gov\r",
+                     ".\r\n",
+                     #state
+                     "301 List follows.\r\n",
+                     "closed::really closed",
+                     "analyzed:deeply:This was analyzed deeply.\r",
+                     ".\r\n",
+                     #fieldnames
+                     "301 List follows.\r\n",
+                     "field1\r",
+                     "field2\r",
+                     ".\r\n",
+                     #initialinput
+                     "301 List follows.\r\n",
+                     "field1\r",
+                     "field2\r",
+                     ".\r\n",
+                     #initialrequired
+                     "301 List follows.\r\n",
+                     "field1\r",
+                     "field2\r",
+                     ".\r\n",
+                     #databases
+                     "301 List follows.\r\n",
+                     "db1:db1 desc:/path/to/db1\r",
+                     "db2:db2 desc:/path/to/db2\r",
+                     ".\r\n",
+
+                     #
+                     # Do same thing, but through Net::Gnats
+                     #
+                     @{ conn() },
+                     @{ user() },
+                     "210-Now accessing GNATS database 'default'\r\n",
+                     "210 User access level set to 'admin'\r\n",
+                     @{ schema1() },
                      #category
                      "301 List follows.\r\n",
                      "cat1:cat1 desc:joe:mark\r",
@@ -190,5 +273,22 @@ my $dbs = [
 
 is_deeply $g->issue($c1_dbs)->formatted, $dbs, 'list_databases';
 
+
+
+#======================
+
+my $gnats = Net::Gnats->new;
+$gnats->gnatsd_connect;
+$gnats->login('default', 'madmin', 'madmin');
+
+is_deeply $gnats->list_categories, $cat1, 'list_categories';
+is_deeply $gnats->list_submitters, $sub1, 'list_submitters';
+is_deeply $gnats->list_responsible, $resp1, 'list_responsible';
+is_deeply $gnats->list_states, $s1, 'list_states';
+is_deeply $gnats->list_fieldnames, $lfn, 'list_fieldnames';
+is_deeply $gnats->list_inputfields_initial, $lii, 'list_inputfields_initial';
+is_deeply $gnats->list_inputfields_initial_required, $lir,
+  'list_inputfields_initial_required';
+is_deeply $gnats->list_databases, $dbs, 'list_databases';
 
 done_testing();
