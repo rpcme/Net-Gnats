@@ -111,11 +111,6 @@ sub is_connected {
   $self->{connected};
 }
 
-sub no_schema {
-  my ( $self ) = @_;
-  $self->{no_schema} = 0 if not defined $self->{no_schema};
-  $self->{no_schema};
-}
 
 
 =head2 password
@@ -276,8 +271,6 @@ sub gconnect {
 
   return $self if $self->access eq 'none' or $self->access eq 'deny' or $self->access eq 'listdb';
 
-#  $self->{schema} = Net::Gnats::Schema->new($self) unless $self->no_schema;
-
   return $self;
 }
 
@@ -327,7 +320,7 @@ sub issue {
   }
   # This will be a whole serialized PR.
   elsif ($command->response->code == CODE_SEND_PR) {
-    $command->response( $self->_run( $command->pr  . "\n." ) );
+    $command->response( $self->_run( $command->pr->asString  . "\n." ) );
   }
   return $command;
 }
@@ -395,7 +388,6 @@ sub _read {
   return $response;
 }
 
-
 sub _read_clean {
   my ( $self, $line ) = @_;
   if ( not defined $line ) { return; }
@@ -409,33 +401,6 @@ sub _read_decompose {
   my ( $self, $raw ) = @_;
   my @result = $raw =~ /^(\d\d\d)([- ]?)(.*$)/sxm;
   return \@result;
-}
-
-sub _read_has_more {
-  my ( $self, $parts ) = @_;
-  debug('_read_has_more');
-  if ( @{$parts}[0] ) {
-    debug('_read_has_more: has code');
-    if ( @{$parts}[1] eq q{-} ) {
-      debug('_read_has_more: has continuation dash');
-      return 1;
-    }
-    elsif ( @{$parts}[0] >= CODE_PR_READY and @{$parts}[0] < CODE_INFORMATION) {
-      debug('_read_has_more: has following information');
-      return 1;
-    }
-    debug('_read_has_more: does not pass');
-    return; # does not pass 'continue' criteria
-  }
-  debug('_read_has_more: no code, multiline read');
-  return 1; # no code, infer multiline read
-}
-
-
-sub _extract_list_content {
-  my ( $self, $response ) = @_;
-  my @lines = split /CRLF/sxm, $response;
-  return @lines;
 }
 
 sub _trace {
