@@ -43,18 +43,17 @@ my $c = 'ADMV';
 sub new {
   my ( $class, %options ) = @_;
   return bless {}, $class if not %options;
-  my $self = bless { field => $options{field},
-                     key => $options{key} }, $class;
+  my $self = bless \%options, $class;
   return $self;
 }
 
-sub field { return shift->{field}; }
+sub field_name { return shift->{field_name}; }
 
 sub key { return shift->{key}; }
 
 sub as_string {
   my $self = shift;
-  return $c . ' ' . $self->{field} . ' ' . $self->{key};
+  return $c . ' ' . $self->field_name . ' ' . $self->key;
 }
 
 1;
