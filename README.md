@@ -18,6 +18,7 @@ Fixed stubbed subroutines which caused test failures for Perl 5.10.1.
 Added additional tests and documentation for Net::Gnats::Command.
 Added additional tests and documentation for Net::Gnats::Command::ADMV.
 Removed dead code from Net::Gnats::Session.
+Bugfix Github issue #6 regarding wrong type returned for query() method.
 
 Changes in 0.17
 ---------------

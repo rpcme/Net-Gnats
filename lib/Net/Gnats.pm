@@ -19,7 +19,7 @@ use Net::Gnats::Constants qw(CODE_OK CODE_GREETING CODE_INFORMATION CODE_TEXT_RE
                              CODE_SEND_PR CODE_SEND_TEXT CODE_FILE_ERROR
                              RESTART_CHECK_THRESHOLD
                              CODE_INFORMATION_FILLER
-                             CODE_NO_PRS_MATCHED 
+                             CODE_NO_PRS_MATCHED
                              CODE_INVALID_EXPR CODE_INVALID_QUERY_FORMAT
                              CODE_PR_READY CODE_INVALID_DATABASE
                              LF CR CRLF DOT CONT MAX_NEW_PRS);
@@ -954,12 +954,12 @@ sub query {
   my $self = shift;
   my @exprs = @_;
 
-  return 0 if not $self->reset_server;
-  return 0 if not $self->qfmt('full');
-  return 0 if not $self->expr(@exprs);
+  return [] if not $self->reset_server;
+  return [] if not $self->qfmt('full');
+  return [] if not $self->expr(@exprs);
 
   my $c = $self->session->issue(Net::Gnats::Command->quer);
-  return 0 if not $c->is_ok;
+  return [] if not $c->is_ok;
   my $r = $c->response->as_list;
   my @numbers = grep { $_ =~ s/>Number:\s+(.*)/$1/} @{$r};
   return \@numbers;
