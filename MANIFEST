@@ -1,4 +1,5 @@
 lib/Net/Gnats.pm
+lib/Net/Gnats/Attachment.pm
 lib/Net/Gnats/Command.pm
 lib/Net/Gnats/Command/ADMV.pm
 lib/Net/Gnats/Command/APPN.pm
@@ -43,6 +44,8 @@ README
 t/01_constants1.t
 t/02_sessions.t
 t/03_documentation.t
+t/04_command.t
+t/05_attachment.t
 t/gnats_admv.t
 t/gnats_appn.t
 t/gnats_chdb.t
@@ -73,7 +76,6 @@ t/gnats_undb.t
 t/gnats_unlk.t
 t/gnats_user.t
 t/gnats_vfld.t
-t/Gtdata.pm
 t/live.t
 t/Net/Gnats/TestData/Gtdata.pm
 t/prparser.t
