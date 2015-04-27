@@ -464,16 +464,23 @@ sub list_inputfields_initial_required {
 
 =head2 get_field_type
 
-Expects a fieldname as sole argument, and issues the FTYP command.
-Returns text response or undef if error.
+Expects a single fieldname or an anonymous array of field types.
+
+Returns 0 if the type information could not be retrieved.
+
+Returns a list of types based on the number of fields passed.
 
 =cut
 
 sub get_field_type {
   my ( $self, $field ) = @_;
-  if (not defined $field) { return 0; }
-  $self->session->issue(Net::Gnats::Command->ftyp(fields => $field)
-                       )->response->as_list;
+
+  return 0 if not defined $field;
+
+  my $c = $self->session->issue(Net::Gnats::Command->ftyp(fields => $field));
+
+  return 0 if not $c->is_ok;
+  return $c->response->as_list;
 }
 
 =head2 get_field_type_info

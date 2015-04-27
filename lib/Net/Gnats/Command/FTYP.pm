@@ -102,6 +102,7 @@ sub as_string {
 sub is_ok {
   my $self = shift;
   return 0 if not defined $self->response;
+  return 0 if not defined $self->response->code;
 
   if ( $self->{requests_multi} == 0 and
        $self->response->code == CODE_INFORMATION) {
@@ -113,4 +114,3 @@ sub is_ok {
 
 
 1;
-

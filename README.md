@@ -21,6 +21,7 @@ Changes in 0.18
 - Added additional tests and documentation for Net::Gnats::Command::ADMV.
 - Removed dead code from Net::Gnats::Session.
 - Bugfix Github issue #6 regarding wrong type returned for query() method.
+- Added additional tests and documentation for Net::Gnats get_field_type.
 
 Changes in 0.17
 ---------------
