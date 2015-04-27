@@ -13,6 +13,7 @@ use MIME::Base64;
 use Net::Gnats::Constants qw(FROM_FIELD REPLYTO_FIELD TO_FIELD CC_FIELD SUBJECT_FIELD SENDPR_VER_FIELD NOTIFY_FIELD);
 
 use Net::Gnats::FieldInstance;
+use Net::Gnats::Attachment;
 
 $| = 1;
 require Exporter;
@@ -424,9 +425,10 @@ sub deserialize {
     }
 
     if ( defined $name and _is_header_line( $name . ':' ) ) {
-      $pr->add_field(Net::Gnats::FieldInstance->new( name => $name,
-                                                     value => $content,
-                                                     schema => $schema->field($name)));
+      $pr->add_field(
+        Net::Gnats::FieldInstance->new( name => $name,
+                                        value => $content,
+                                        schema => $schema->field($name)));
       next;
     }
 
@@ -452,27 +454,27 @@ sub deserialize {
       $pr->add_field(Net::Gnats::FieldInstance->new( name => 'X-GNATS-Notify',
                                                      value => '' ));
   }
-  
-#  delete $fields_have->{'From'};
 
+  # Create an Unformatted field if it doesn't come in from Gnats.
+  if (not $pr->get_field($UNFORMATTED_FIELD)) {
+    $pr->add_field(Net::Gnats::FieldInstance->new( name => $UNFORMATTED_FIELD,
+                                                   value => '' ));
+  }
 
-  # 3/30/99 kenstir: For some reason Unformatted always ends up with an
-  # extra newline here.
-  #$fields_have->{$UNFORMATTED_FIELD} ||= ''; # Default to empty value
-  #$fields_have->{$UNFORMATTED_FIELD} =~ s/\n$//;
+  my @attachments = split /$attachment_delimiter/,
+                          $pr->get_field($UNFORMATTED_FIELD)->value;
 
-  # Decode attachments stored in Unformatted field.
-#  my $any_attachments = 0;
-
-#  my(@attachments) = split /$attachment_delimiter/, $fields_have->{$UNFORMATTED_FIELD};
+  return $pr if scalar ( @attachments ) == 0;
 
   # First element is any random text which precedes delimited attachments.
-#  $fields_have->{$UNFORMATTED_FIELD} = shift @attachments;
-#  foreach my $attachment (@attachments) {
-#      $any_attachments = 1;
-#      $attachment =~ s/^[ ]//mg;
-#      add_decoded_attachment_to_pr($fields_have, decode_attachment($attachment));
-  #    }
+  $pr->get_field($UNFORMATTED_FIELD)->value( shift @attachments );
+
+  foreach my $attachment (@attachments) {
+    # encoded PR always has a space in front of it
+    push @{$pr->{attachments}},
+         Net::Gnats::Attachment->new( payload => $attachment );
+  }
+
   return $pr;
 }
 
@@ -529,7 +531,7 @@ sub serialize {
     # Do include Unformatted field in 'send' operation, even though
     # it's excluded.  We need it to hold the file attachment.
     # XXX ??? !!! FIXME
-    
+
 #    if(($purpose eq 'send')
 #       && (! ($self->{__gnatsObj}->getFieldTypeInfo ($_, 'flags') & $SENDINCLUDE))
 #       && ($_ ne $UNFORMATTED_FIELD))
@@ -537,7 +539,9 @@ sub serialize {
 #      next;
 #    }
 
-    
+    if ($fn eq 'Unformatted') {
+      next;
+    }
 #    $fields{$_} ||= ''; # Default to empty
     if ( $field->schema->type eq 'MultiText' ) {
       $tmp = $field->value;
