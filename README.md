@@ -9,8 +9,11 @@ Repository for the Net::Gnats module.
 Version
 -------
 
-- The current CPAN release version is 0.17.
-- The current working version is 0.18.
+- The current CPAN release version is 0.18.
+- The current working version is 0.19.
+
+Changes in 0.19
+---------------
 
 Changes in 0.18
 ---------------
