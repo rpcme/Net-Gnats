@@ -5,7 +5,7 @@ use 5.10.00;
 use MIME::Base64;
 
 BEGIN {
-  $Net::Gnats::VERSION = '0.18';
+  $Net::Gnats::Attachment::VERSION = '0.19';
 }
 use vars qw($VERSION);
 
@@ -16,7 +16,7 @@ sub new {
 }
 
 sub encode {
-  
+
 }
 
 sub decode {

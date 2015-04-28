@@ -2,7 +2,7 @@ package Net::Gnats::Command::FVLD;
 use parent 'Net::Gnats::Command';
 use strictures;
 BEGIN {
-  $Net::Gnats::VERSION = '0.18';
+  $Net::Gnats::Command::FVLD::VERSION = '0.19';
 }
 use vars qw($VERSION);
 

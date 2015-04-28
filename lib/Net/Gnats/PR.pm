@@ -4,7 +4,7 @@ use utf8;
 use strictures;
 
 BEGIN {
-  $Net::Gnats::VERSION = '0.18';
+  $Net::Gnats::PR::VERSION = '0.19';
 }
 use vars qw($VERSION);
 
