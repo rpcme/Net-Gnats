@@ -38,7 +38,7 @@ Net::Gnats - Perl interface to GNU Gnats daemon
 
 =head1 VERSION
 
-0.14
+0.19
 
 =head1 DESCRIPTION
 

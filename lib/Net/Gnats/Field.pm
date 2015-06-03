@@ -111,8 +111,11 @@ Creates an instance of this meta field.  Represents a literal field in a PR.
 =cut
 
 sub instance {
-  my $self = shift;
-  return Net::Gnats::FieldInstance->new( schema => $self, name => $self->name );
+  my ( $self, %options ) = @_;
+  my $name = defined $options{for_name} ? $options{for_name} : $self->name;
+  my $fi = Net::Gnats::FieldInstance->new( schema => $self, name => $name );
+  $fi->value( $options{value} ) if defined $options{value};
+  return $fi;
 }
 
 sub _create_change_reason {

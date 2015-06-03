@@ -324,20 +324,22 @@ sub parse_line {
   my $result = [];
 
   if (_is_header_line($line)) {
-    my @found = $line =~ /^([\w\-]+):\s*(.*)$/;
+    my @found = $line =~ /^([\w\-\{\}]+):\s*(.*)$/;
     return \@found;
   }
 
-  my @found = $line =~ /^>([\w\-]+):\s*(.*)$/;
+  my @found = $line =~ /^>([\w\-\{\d\}]+):\s*(.*)$/;
 
   if ( not defined $found[0] ) {
     @{ $result }[1] = $line;
     return $result;
   }
 
-  my $found = grep { $_ eq $found[0] } @{ $known };
+  my $schemaname = _schema_fieldname($found[0]);
 
-  if ( $found == 0 ) {
+  my $schema_found = grep { $_ eq $schemaname } @{ $known };
+
+  if ( $schema_found == 0 ) {
     @{ $result }[1] = $line;
     return $result;
   }
@@ -346,6 +348,21 @@ sub parse_line {
   $found[1] =~ s/\s+$//;
   @{ $result }[1] = $found[1];
   return $result;
+}
+
+sub _schema_fieldname {
+  my ( $fieldname ) = @_;
+  my $schemaname = $fieldname;
+  $schemaname =~ s/{\d+}$//;
+  return $schemaname;
+}
+
+sub _schema_fieldinstance {
+  my ( $self, $fieldname ) = @_;
+  return Net::Gnats->current_session
+                   ->schema
+                   ->field(_schema_fieldname($fieldname))
+                   ->instance( for_name => $fieldname );
 }
 
 sub _clean {
@@ -434,7 +451,7 @@ sub deserialize {
 
     # known header field found, save.
     if ( defined $name ) {
-      $field = $schema->field( $name )->instance;
+      $field = $self->_schema_fieldinstance($name);
       $field->value($content);
       $pr->add_field($field);
     }
