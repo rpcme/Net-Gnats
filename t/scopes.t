@@ -70,11 +70,24 @@ my $f2 = $g->current_session
 my $pr1 = Net::Gnats::PR->deserialize(data => pr1(),
                                       schema => $g->current_session->schema);
 
+my $pr2 = Net::Gnats::PR->deserialize(data => pr2(),
+                                      schema => $g->current_session->schema);
+
+my $pr3 = Net::Gnats::PR->deserialize(data => pr3(),
+                                      schema => $g->current_session->schema);
+
 # Verify the field
 is $pr1->getField('Originator{1}'), 'Doctor Wifflechumps', 'field found';
 
-# Add a new field
+# Replace a field
+# https://github.com/Miniconf/Net-Gnats/issues/1
+isa_ok $pr1->get_field( 'Number' ), 'Net::Gnats::FieldInstance';
+isa_ok $pr1->get_field( 'Originator{1}' ), 'Net::Gnats::FieldInstance';
 
+isa_ok $pr2->get_field( 'Responsible{1}' ), 'Net::Gnats::FieldInstance';
+is     $pr3->get_field( 'Responsible{1}' ), undef;
+
+is_deeply $pr2->get_field_from('Responsible'), [ 'Responsible{1}','Responsible{2}','Responsible{3}']; 
 
 # Modify an existing field
 
@@ -96,6 +109,62 @@ sub pr1 {
           ">Severity:       serious\r\n",
           ">Priority:       medium\r\n",
           ">Responsible:    gnats-admin\r\n",
+          ">State:          open\r\n",
+          ">Class:          sw-bug\r\n",
+          ">Submitter-Id:   unknown\r\n",
+          ">Arrival-Date:   Fri Aug 15 17:43:51 +1000 2014\r\n",
+          ">Last-Modified:  Fri Aug 15 17:43:51 +1000 2014\r\n",
+          ">Originator{1}:  Doctor Wifflechumps\r\n",
+          ">Release:        \r\n",
+          ">Fix:\r\n",
+          ">Unformatted:\r\n",
+          "\r\n",];
+}
+
+sub pr2 {
+  return ["From: Doctor Wifflechumps\r\n",
+          "Reply-To: Doctor Wifflechumps\r\n",
+          "To: bugs\r\n",
+          "Cc:\r\n",
+          "Subject: Some bug from perlgnats\r\n",
+          "X-Send-Pr-Version: Net::Gnats-0.07 (\$Id: PR.pm,v 1.3 2014/08/14 13:32:27 thacker Exp \$)\r\n",
+          "\r\n",
+          ">Number:         45\r\n",
+          ">Category:       pending\r\n",
+          ">Synopsis:       changing you\r\n",
+          ">Confidential:   yes\r\n",
+          ">Severity:       serious\r\n",
+          ">Priority:       medium\r\n",
+          ">Responsible{1}: gnats-admin\r\n",
+          ">Responsible{2}: gnats-admin\r\n",
+          ">Responsible{3}: gnats-admin\r\n",
+          ">State:          open\r\n",
+          ">Class:          sw-bug\r\n",
+          ">Submitter-Id:   unknown\r\n",
+          ">Arrival-Date:   Fri Aug 15 17:43:51 +1000 2014\r\n",
+          ">Last-Modified:  Fri Aug 15 17:43:51 +1000 2014\r\n",
+          ">Originator{1}:  Doctor Wifflechumps\r\n",
+          ">Release:        \r\n",
+          ">Fix:\r\n",
+          ">Unformatted:\r\n",
+          "\r\n",];
+}
+
+sub pr3 {
+  return ["From: Doctor Wifflechumps\r\n",
+          "Reply-To: Doctor Wifflechumps\r\n",
+          "To: bugs\r\n",
+          "Cc:\r\n",
+          "Subject: Some bug from perlgnats\r\n",
+          "X-Send-Pr-Version: Net::Gnats-0.07 (\$Id: PR.pm,v 1.3 2014/08/14 13:32:27 thacker Exp \$)\r\n",
+          "\r\n",
+          ">Number:         45\r\n",
+          ">Category:       pending\r\n",
+          ">Synopsis:       changing you\r\n",
+          ">Confidential:   yes\r\n",
+          ">Severity:       serious\r\n",
+          ">Priority:       medium\r\n",
+          ">responsible{1}: gnats-admin\r\n",
           ">State:          open\r\n",
           ">Class:          sw-bug\r\n",
           ">Submitter-Id:   unknown\r\n",

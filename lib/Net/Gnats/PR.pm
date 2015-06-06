@@ -161,6 +161,17 @@ sub get_field {
   return undef;
 }
 
+sub get_field_from {
+  my ( $self, $fieldname) = @_;
+  my $result = [];
+
+  foreach my $field ( keys %{ $self->{fields} } ) {
+    push @$result, $field if $field =~ qr/^$fieldname/;
+  }
+
+  return $result;
+}
+
 =head2 replaceField
 
 Sets a new value for an existing field.
