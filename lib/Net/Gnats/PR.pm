@@ -165,7 +165,7 @@ sub get_field_from {
   my ( $self, $fieldname) = @_;
   my $result = [];
 
-  foreach my $field ( keys %{ $self->{fields} } ) {
+  foreach my $field ( sort keys %{ $self->{fields} } ) {
     push @$result, $field if $field =~ qr/^$fieldname/;
   }
 
