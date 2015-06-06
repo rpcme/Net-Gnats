@@ -453,6 +453,7 @@ Deserializes a PR from Gnats and returns a hydrated PR.
                                       schema => $s->schema);
 
 =cut
+
 sub setFromString {
   my ($self, $data) = @_;
   # expects just a block of text, so we need to break it out
