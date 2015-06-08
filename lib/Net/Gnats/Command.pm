@@ -4,7 +4,7 @@ use strictures;
 use Scalar::Util 'reftype';
 
 BEGIN {
-  $Net::Gnats::Command::VERSION = '0.19';
+  $Net::Gnats::Command::VERSION = '0.20';
 }
 use vars qw($VERSION);
 

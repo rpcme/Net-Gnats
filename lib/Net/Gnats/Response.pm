@@ -2,7 +2,7 @@ package Net::Gnats::Response;
 use v5.10.00;
 use strictures;
 BEGIN {
-  $Net::Gnats::Response::VERSION = '0.19';
+  $Net::Gnats::Response::VERSION = '0.20';
 }
 use vars qw($VERSION);
 

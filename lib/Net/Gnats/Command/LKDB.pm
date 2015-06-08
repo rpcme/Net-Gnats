@@ -2,7 +2,7 @@ package Net::Gnats::Command::LKDB;
 use parent 'Net::Gnats::Command';
 use strictures;
 BEGIN {
-  $Net::Gnats::Command::LKDB::VERSION = '0.19';
+  $Net::Gnats::Command::LKDB::VERSION = '0.20';
 }
 use vars qw($VERSION);
 

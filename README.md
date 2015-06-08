@@ -9,11 +9,17 @@ Repository for the Net::Gnats module.
 Version
 -------
 
-- The current CPAN release version is 0.18.
-- The current working version is 0.19.
+- The current CPAN release version is 0.20.
+- The current working version is 0.21.
+
+Changes in 0.20
+---------------
+- Add capability to get any number of fields starting with a specific string.
+- Misc fixes and documentation amendments from Miniconf NYC.
 
 Changes in 0.19
 ---------------
+- Add 'scopes' capability to fields.
 
 Changes in 0.18
 ---------------

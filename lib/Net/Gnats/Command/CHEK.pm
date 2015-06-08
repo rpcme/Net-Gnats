@@ -2,7 +2,7 @@ package Net::Gnats::Command::CHEK;
 use parent 'Net::Gnats::Command';
 use strictures;
 BEGIN {
-  $Net::Gnats::Command::CHEK::VERSION = '0.19';
+  $Net::Gnats::Command::CHEK::VERSION = '0.20';
 }
 use vars qw($VERSION);
 

@@ -2,7 +2,7 @@ package Net::Gnats::Command::FTYP;
 use parent 'Net::Gnats::Command';
 use strictures;
 BEGIN {
-  $Net::Gnats::Command::FTYP::VERSION = '0.19';
+  $Net::Gnats::Command::FTYP::VERSION = '0.20';
 }
 use vars qw($VERSION);
 

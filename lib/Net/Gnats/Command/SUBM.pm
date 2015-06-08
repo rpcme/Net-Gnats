@@ -2,7 +2,7 @@ package Net::Gnats::Command::SUBM;
 use parent 'Net::Gnats::Command';
 use strictures;
 BEGIN {
-  $Net::Gnats::Command::SUBM::VERSION = '0.19';
+  $Net::Gnats::Command::SUBM::VERSION = '0.20';
 }
 use vars qw($VERSION);
 

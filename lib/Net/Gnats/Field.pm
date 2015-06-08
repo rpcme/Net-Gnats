@@ -1,7 +1,7 @@
 package Net::Gnats::Field;
 use strictures;
 BEGIN {
-  $Net::Gnats::Field::VERSION = '0.19';
+  $Net::Gnats::Field::VERSION = '0.20';
 }
 use vars qw($VERSION);
 
