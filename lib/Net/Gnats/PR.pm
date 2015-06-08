@@ -141,9 +141,12 @@ sub getNumber {
   return shift->{fields}->{'Number'}->value;
 }
 
-=head1 METHODS
+=head2 add_field
+
+Adds a field instance to the fieldlist of a Nets::Gnats::PR object for fields that are not header fields.
 
 =cut
+
 
 sub add_field {
   my ($self, $field) = @_;
@@ -155,17 +158,30 @@ sub add_field {
   return;
 }
 
+=head2 get_field
+
+Returns a field instance of an Nets::Gnats::PR object if field instance is defined.
+
+=cut
+
 sub get_field {
   my ($self, $fieldname) = @_;
   return $self->{fields}->{$fieldname} if defined $self->{fields}->{$fieldname};
   return undef;
 }
 
+=head2 get_field_from
+
+Return an anonymous array of Nets::Gnats::PR object fields instances from a word part match.
+
+=cut
+
+
 sub get_field_from {
   my ( $self, $fieldname) = @_;
   my $result = [];
 
-  foreach my $field ( keys %{ $self->{fields} } ) {
+  foreach my $field ( sort keys %{ $self->{fields} } ) {
     push @$result, $field if $field =~ qr/^$fieldname/;
   }
 
@@ -212,7 +228,7 @@ sub replaceField {
 
 =head2 setField
 
-Sets a gnats field value.  Expects two arguments: the field name
+Sets a Gnats field value.  Expects two arguments: the field name
 followed by the field value.  If the field requires a change reason,
 provide it as a third argument.
 
@@ -282,8 +298,13 @@ sub submit {
   return $self;
 }
 
-# Split comma-separated list.
-# Commas in quotes are not separators!
+=head2 split_csl
+
+ Split comma-separated list.
+ Commas in quotes are not separators!
+
+=cut
+
 sub split_csl {
   my ($list) = @_;
 
@@ -306,12 +327,15 @@ sub split_csl {
   return @res;
 }
 
-# fix_email_addrs -
-#     Trim email addresses as they appear in an email From or Reply-To
-#     header into a comma separated list of just the addresses.
-#
-#     Delete everything inside ()'s and outside <>'s, inclusive.
-#
+=head2  fix_email_addrs 
+
+  Trim email addresses as they appear in an email From or Reply-To
+  header into a comma separated list of just the addresses.
+
+  Delete everything inside ()'s and outside <>'s, inclusive.
+
+=cut
+
 sub fix_email_addrs
 {
   my $addrs = shift;
@@ -329,6 +353,12 @@ sub fix_email_addrs
   $addrs = join(', ', @trimmed_addrs);
   $addrs;
 }
+
+=head2 parse_line
+
+Breaks down a Gnats query result. 	
+
+=cut
 
 sub parse_line {
   my ( $line, $known ) = @_;
@@ -423,6 +453,7 @@ Deserializes a PR from Gnats and returns a hydrated PR.
                                       schema => $s->schema);
 
 =cut
+
 sub setFromString {
   my ($self, $data) = @_;
   # expects just a block of text, so we need to break it out
