@@ -2,7 +2,7 @@ package Net::Gnats::Command::DBDESC;
 use parent 'Net::Gnats::Command';
 use strictures;
 BEGIN {
-  $Net::Gnats::Command::DBDESC::VERSION = '0.20';
+  $Net::Gnats::Command::DBDESC::VERSION = '0.21';
 }
 use vars qw($VERSION);
 

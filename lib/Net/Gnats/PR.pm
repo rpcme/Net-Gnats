@@ -4,7 +4,7 @@ use utf8;
 use strictures;
 
 BEGIN {
-  $Net::Gnats::PR::VERSION = '0.20';
+  $Net::Gnats::PR::VERSION = '0.21';
 }
 use vars qw($VERSION);
 
@@ -215,9 +215,11 @@ sub replaceField {
   if ($f->schema->requires_change_reason) {
     return Net::Gnats
         ->current_session
-        ->issue(Net::Gnats::Command->repl(pr_number => $self->get_field('Number')->value,
-                                          field => $f,
-                                          field_change_reason => $self->get_field($name . '-Changed-Why')))->is_ok;
+        ->issue(Net::Gnats::Command->repl(
+          pr_number => $self->get_field('Number')->value,
+          field => $f,
+          field_change_reason => $self->get_field($name . '-Changed-Why')))
+        ->is_ok;
   }
   return Net::Gnats
     ->current_session
@@ -242,7 +244,8 @@ sub setField {
   if ($f->schema->requires_change_reason) {
     return 0 if (not defined $reason_value);
     my $cr_instance =
-      Net::Gnats::FieldInstance->new(schema => $f->schema->change_reason_field);
+      Net::Gnats::FieldInstance->new(
+        schema => $f->schema->change_reason_field($name));
     $cr_instance->value($reason_value);
     $self->add_field($cr_instance);
   }
@@ -327,7 +330,7 @@ sub split_csl {
   return @res;
 }
 
-=head2  fix_email_addrs 
+=head2  fix_email_addrs
 
   Trim email addresses as they appear in an email From or Reply-To
   header into a comma separated list of just the addresses.
@@ -356,7 +359,7 @@ sub fix_email_addrs
 
 =head2 parse_line
 
-Breaks down a Gnats query result. 	
+Breaks down a Gnats query result.
 
 =cut
 
@@ -617,7 +620,7 @@ sub serialize {
     if ($pr->get_field($field->name . '-Changed-Why')) {
       # Lines which begin with a '.' need to be escaped by another '.'
       # if we're feeding it to gnatsd.
-      $tmp = $pr->get_field($_."-Changed-Why")->value;
+      $tmp = $pr->get_field($_ . '-Changed-Why')->value;
       $tmp =~ s/^[.]/../gm;
       $text .= sprintf(">%s-Changed-Why:\n%s\n", $field->name, $tmp);
     }

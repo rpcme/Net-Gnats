@@ -1,7 +1,7 @@
 package Net::Gnats::Field;
 use strictures;
 BEGIN {
-  $Net::Gnats::Field::VERSION = '0.20';
+  $Net::Gnats::Field::VERSION = '0.21';
 }
 use vars qw($VERSION);
 
@@ -47,9 +47,9 @@ sub new {
 }
 
 sub change_reason_field {
-  my ($self) = @_;
+  my ( $self, $name ) = @_;
   return undef if not $self->requires_change_reason;
-  $self->_create_change_reason if not defined $self->{change_reason};
+  $self->_create_change_reason($name) if not defined $self->{change_reason};
   return $self->{change_reason};
 }
 
@@ -119,9 +119,9 @@ sub instance {
 }
 
 sub _create_change_reason {
-  my ($self) = @_;
+  my ($self, $name) = @_;
   my $f = Net::Gnats::Field->new;
-  $f->name($self->name . '-Changed-Why');
+  $f->name($name . '-Changed-Why');
   $f->description($self->description . ' - Reason for Change');
   $f->type('multiText');
   $self->{change_reason} = $f;

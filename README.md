@@ -9,8 +9,15 @@ Repository for the Net::Gnats module.
 Version
 -------
 
-- The current CPAN release version is 0.20.
-- The current working version is 0.21.
+- The current CPAN release version is 0.21.
+- The current working version is 0.22.
+
+
+Changes in 0.21
+---------------
+- Fix bug relating to scopes and change required field.  It's a temporary Fix
+  until something more permanent can be put into place; effectively, it just
+  forces the change-required field to match properly.
 
 Changes in 0.20
 ---------------

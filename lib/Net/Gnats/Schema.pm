@@ -1,7 +1,7 @@
 package Net::Gnats::Schema;
 use strictures;
 BEGIN {
-  $Net::Gnats::Schema::VERSION = '0.20';
+  $Net::Gnats::Schema::VERSION = '0.21';
 }
 use vars qw($VERSION);
 

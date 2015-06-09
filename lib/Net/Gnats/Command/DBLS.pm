@@ -2,7 +2,7 @@ package Net::Gnats::Command::DBLS;
 use parent 'Net::Gnats::Command';
 use strictures;
 BEGIN {
-  $Net::Gnats::Command::DBLS::VERSION = '0.20';
+  $Net::Gnats::Command::DBLS::VERSION = '0.21';
 }
 use vars qw($VERSION);
 

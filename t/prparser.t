@@ -46,7 +46,12 @@ $module->set_series( 'getline',
                      "210 User access level set to 'admin'\r\n",
                      @{ schema1() },
                      @{ querprep() },
-                     @{ pr1() }
+                     @{ pr1() },
+                     @{ querprep() },
+                     @{ pr2() },
+                     "212 Ok.",  # send text
+                     "213 Ok.",  # send change reason                     
+                     "210 Ok.",  # accept text
                    );
 
 my $g = Net::Gnats->new();
@@ -55,6 +60,10 @@ $g->login('default', 'madmin', 'madmin');
 isa_ok my $pr = $g->get_pr_by_number('45'), 'Net::Gnats::PR';
 is $pr->getNumber, '45';
 is $pr->getField('Confidential'), 'yes';
+
+isa_ok my $pr2 = $g->get_pr_by_number('46'), 'Net::Gnats::PR';
+is $pr2->get_field('Responsible{1}')->value, '';
+is $pr2->replaceField('Responsible{1}', 'someone', 'reqchange'), 1;
 
 done_testing;
 
@@ -93,5 +102,38 @@ sub pr1 {
           "\r\n",
           ".\r\n",];
 }
+
+
+sub pr2 {
+  return ["300 PRs follow.\r\n",
+          "From: Doctor Wifflechumps\r\n",
+          "Reply-To: Doctor Wifflechumps\r\n",
+          "To: bugs\r\n",
+          "Cc:\r\n",
+          "Subject: Some bug from perlgnats\r\n",
+          "X-Send-Pr-Version: Net::Gnats-0.07 (\$Id: PR.pm,v 1.3 2014/08/14 13:32:27 thacker Exp \$)\r\n",
+          "\r\n",
+          ">Number:         46\r\n",
+          ">Category:       pending\r\n",
+          ">Synopsis:       changing you\r\n",
+          ">Confidential:   yes\r\n",
+          ">Severity:       serious\r\n",
+          ">Priority:       medium\r\n",
+          ">Responsible{0}: gnats-admin\r\n",
+          ">Responsible{1}: \r\n",
+          ">State:          open\r\n",
+          ">Class:          sw-bug\r\n",
+          ">Submitter-Id:   unknown\r\n",
+          ">Arrival-Date:   Fri Aug 15 17:43:51 +1000 2014\r\n",
+          ">Last-Modified:  Fri Aug 15 17:43:51 +1000 2014\r\n",
+          ">Originator:     Doctor Wifflechumps\r\n",
+          ">Release:        \r\n",
+          ">Fix:\r\n",
+          ">Unformatted:\r\n",
+          "\r\n",
+          ".\r\n",];
+}
+
+
 
 #Number Notify-List Category Synopsis Confidential Severity Priority Responsible State Class Submitter-Id Arrival-Date Closed-Date Last-Modified Originator Release Organization Environment Description How-To-Repeat Fix Release-Note Audit-Trail Unformatted
