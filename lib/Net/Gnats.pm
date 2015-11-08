@@ -1,6 +1,6 @@
 package Net::Gnats;
 BEGIN {
-  $Net::Gnats::VERSION = '0.21';
+  $Net::Gnats::VERSION = '0.22';
 }
 use 5.010_000;
 use utf8;
@@ -38,7 +38,7 @@ Net::Gnats - Perl interface to GNU Gnats daemon
 
 =head1 VERSION
 
-0.19
+0.22
 
 =head1 DESCRIPTION
 

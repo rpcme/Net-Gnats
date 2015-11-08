@@ -2,7 +2,7 @@ package Net::Gnats::Command::UNDB;
 use parent 'Net::Gnats::Command';
 use strictures;
 BEGIN {
-  $Net::Gnats::Command::UNDB::VERSION = '0.21';
+  $Net::Gnats::Command::UNDB::VERSION = '0.22';
 }
 use vars qw($VERSION);
 

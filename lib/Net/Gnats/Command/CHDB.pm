@@ -2,7 +2,7 @@ package Net::Gnats::Command::CHDB;
 use parent 'Net::Gnats::Command';
 use strictures;
 BEGIN {
-  $Net::Gnats::Command::CHDB::VERSION = '0.21';
+  $Net::Gnats::Command::CHDB::VERSION = '0.22';
 }
 use vars qw($VERSION);
 
