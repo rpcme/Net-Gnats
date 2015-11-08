@@ -9,9 +9,12 @@ Repository for the Net::Gnats module.
 Version
 -------
 
-- The current CPAN release version is 0.21.
+- The current CPAN release version is 0.22.
 - The current working version is 0.22.
 
+Changes in 0.22
+---------------
+- RT 108273 remove PREREQ_FATAL
 
 Changes in 0.21
 ---------------
